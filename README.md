@@ -28,11 +28,10 @@ but any other recent version will do. The license can be found [below](#glm).
 ## Building
 
 *rendirt* uses the meson build system for peace of mind. This is not strictly
-necessary since the project consists of
-[a single header](blob/master/rendirt.hpp) (`rendirt.hpp`) and a
-[single source file](blob/master/rendirt.cpp) (`rendirt.cpp`) which can be
-compiled directly by any C++11 conformant compiler, provided *glm* is available
-in the include path.
+necessary since the project consists of [a single header](rendirt.hpp)
+(`rendirt.hpp`) and a [single source file](rendirt.cpp) (`rendirt.cpp`) which
+can be compiled directly by any C++11 conformant compiler, provided *glm* is
+available in the include path.
 
 To build the *rendirt* static library and examples:
 ```sh
@@ -44,9 +43,9 @@ To use the release configuration (optimized binaries):
 $ meson build --buildtype=release && ninja -C build
 ```
 
-If you can't use *meson* or prefer not to, compiling and linking each
-*cpp* file from the [examples folder](tree/master/examples) together with
-`rendirt.cpp` will do the trick.
+If you can't use *meson* or prefer not to, compiling and linking each *cpp*
+file from the [examples folder](examples) together with `rendirt.cpp` will
+do the trick.
 
 ## It works!
 
@@ -61,8 +60,8 @@ included in this repository because size and LGPL.
 
 ## Documentation
 
-Please read the [header](blob/master/rendirt.hpp) and
-[examples](tree/master/examples) for now, they're short and not very
+Please read the [header](rendirt.hpp) and
+[examples](examples) for now, they're short and not very
 complicated. I'll add some documentation as soon as I have time and feel
 like it (that may easily mean never, though).
 
