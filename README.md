@@ -55,10 +55,10 @@ as `render.tiff` in the current directory:
 $ build/examples/render path/to/file.stl
 ```
 
-The `animation` samples requires SDL2. It will load the given model and
+The `animation` example requires SDL2. It will load the given model and
 display an animated view. Various parameters can be tweaked by pressing keys,
 see command output for instructions. Decent frame rates can be achieved only
-with the release build (optimization enabled).
+with the release build (with optimization enabled).
 ```sh
 $ build/examples/animation path/to/file.stl
 ```
