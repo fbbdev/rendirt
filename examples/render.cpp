@@ -23,6 +23,7 @@
  */
 
 #include "rendirt.hpp"
+#include "tiff.hpp"
 
 #include <cerrno>
 #include <chrono>
@@ -112,6 +113,9 @@ int main(int argc, char* argv[]) {
     start = std::chrono::high_resolution_clock::now();
 
     size_t count = render(img, model, view, proj,
+        // shaders::depth);
+        // shaders::position(model.boundingBox()));
+        // shaders::normal);
         shaders::diffuseDirectional(glm::vec3(0.0f, -1.0f, -1.0f), Color(40, 40, 40, 255), Color(255, 255, 255, 255)));
 
     end = std::chrono::high_resolution_clock::now();
@@ -122,15 +126,24 @@ int main(int argc, char* argv[]) {
               << "Rasterized faces: " << count
               << std::endl;
 
-    // Write out rendered image. Format is R8G8B8A8 (byte order)
-    std::ofstream output("./example.raw", std::ofstream::binary);
+    // Write out rendered image
+    std::ofstream output("./render.tiff", std::ofstream::binary);
     if (!output) {
-        std::cerr << "./example.raw: cannot open file for writing: " << strerror(errno) << std::endl;
+        std::cerr << "./render.tiff: cannot open file for writing: " << strerror(errno) << std::endl;
         return -1;
     }
 
-    output.write(reinterpret_cast<char const*>(buffer.data()), buffer.size()*sizeof(Color));
-    output.close();
+    // Convert image to premultiplied alpha
+    using RGB16 = glm::vec<3, std::uint16_t>;
+
+    for (size_t i = 0, end = img.height*img.stride; i < end; i += img.stride - img.width)
+        for (size_t rend = i + img.width; i < rend; ++i)
+            img.buffer[i] = Color(RGB16(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
+
+    if (!tiff::writeTIFF(output, img)) {
+        std::cerr << "./render.tiff: write failed: " << strerror(errno) << std::endl;
+        return -1;
+    }
 
     return 0;
 }
