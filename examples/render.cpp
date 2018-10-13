@@ -37,7 +37,7 @@ std::ostream& operator<<(std::ostream& stream, glm::vec3 const& v) {
 }
 
 int main(int argc, char* argv[]) {
-    // Loads a STL file and saves the rendered image to render.bmp
+    // Loads a STL file and saves the rendered image to render.tiff
     // if no argument is given on the command line, reads model data from stdin
 
     std::istream* source = &std::cin;
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
     rd::Camera view(
         model.center() + glm::length(diagonal)*glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f)),
         model.center(),
-        { 0.0f, 1.0f, 0.0f });
+        { 0.0f, 1.0f, 0.0f }); // The up vector specifies which direction is 'up'
 
     // Build orthographic projection and ensure it fits the model
     /*rd::Projection proj(
@@ -142,11 +142,11 @@ int main(int argc, char* argv[]) {
     }
 
     // Convert image to premultiplied alpha
-    using RGB16 = glm::vec<3, std::uint16_t>;
+    using RGB48 = glm::vec<3, std::uint16_t>;
 
     for (size_t i = 0, end = img.height*img.stride; i < end; i += img.stride - img.width)
         for (size_t rend = i + img.width; i < rend; ++i)
-            img.buffer[i] = rd::Color(RGB16(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
+            img.buffer[i] = rd::Color(RGB48(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
 
     if (!tiff::writeTIFF(output, img)) {
         std::cerr << "./render.tiff: write failed: " << strerror(errno) << std::endl;
