@@ -50,6 +50,8 @@ int main(int argc, char* argv[]) {
             std::cerr << argv[1] << ": cannot open file for reading: " << strerror(errno) << std::endl;
             return -1;
         }
+    } else {
+        std::cerr << "No file specified, reading from stdin" << std::endl;
     }
 
     using frac_ms = std::chrono::duration<float, std::milli>;
@@ -69,7 +71,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    std::cout << "Model loaded in "
+    std::cerr << "Model loaded in "
               << std::chrono::duration_cast<frac_ms>(end - start).count() << " ms\n"
               << "Face count: " << model.size() << '\n'
               << "Bounding box: { " << model.boundingBox().from << ", " << model.boundingBox().to << " }\n"
@@ -83,14 +85,16 @@ int main(int argc, char* argv[]) {
     img.clear(Color(0, 0, 0, 255));
 
     // Precalculate useful values
-    auto aspect = float(img.width) / float(img.height);
-    auto diagonal = glm::abs(model.boundingBox().to - model.boundingBox().from);
+    float aspect = float(img.width) / float(img.height);
+    glm::vec3 diagonal = glm::abs(model.boundingBox().to - model.boundingBox().from);
     float maxDim = glm::max(diagonal.x, glm::max(diagonal.y, diagonal.z));
 
+    // Stop the compiler from complaining when orthographic projection
+    // is commented out
     (void)aspect; (void)maxDim;
 
-    // With the center of the bounding box as origin,
-    // place camera at (r=|diagonal|, theta=45deg, phi=45deg).
+    // Use the center of the bounding box as origin.
+    // Place camera at (r=|diagonal|, theta=45deg, phi=45deg).
     // Look into the center of the bounding box.
     Camera view(
         model.center() + glm::length(diagonal)*glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f)),
@@ -112,15 +116,15 @@ int main(int argc, char* argv[]) {
 
     start = std::chrono::high_resolution_clock::now();
 
-    size_t count = render(img, model, view, proj,
+    size_t count = rendirt::render(img, model, view, proj,
         // shaders::depth);
         // shaders::position(model.boundingBox()));
         // shaders::normal);
-        shaders::diffuseDirectional(glm::vec3(0.0f, -1.0f, -1.0f), Color(40, 40, 40, 255), Color(255, 255, 255, 255)));
+        shaders::diffuseDirectional(glm::vec3(0.0f, -1.0f, -1.0f), Color(40, 40, 40, 255), Color(200, 200, 200, 255)));
 
     end = std::chrono::high_resolution_clock::now();
 
-    std::cout << "Rendering completed in "
+    std::cerr << "Rendering completed in "
               << std::chrono::duration_cast<frac_ms>(end - start).count() << " ms\n"
               << "Resolution: " << img.width << "x" << img.height << " px\n"
               << "Rasterized faces: " << count
@@ -144,6 +148,9 @@ int main(int argc, char* argv[]) {
         std::cerr << "./render.tiff: write failed: " << strerror(errno) << std::endl;
         return -1;
     }
+
+    output.close();
+    std::cerr << "Image saved to ./render.tiff" << std::endl;
 
     return 0;
 }
