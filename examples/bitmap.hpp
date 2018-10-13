@@ -37,8 +37,11 @@ namespace bmp {
         std::uint16_t bfReserved2 = 0;
         std::uint32_t bfOffBits;
 
+        static constexpr size_t Size = sizeof(bfType) + sizeof(bfSize) +
+                                       sizeof(bfReserved1) + sizeof(bfReserved2) + sizeof(bfOffBits);
+
         std::ostream& write(std::ostream& stream) {
-            stream.write(bfType, 2);
+            stream.write(bfType, sizeof(bfType));
             stream.write(reinterpret_cast<char const*>(&bfSize), sizeof(bfSize));
             stream.write(reinterpret_cast<char const*>(&bfReserved1), sizeof(bfReserved1));
             stream.write(reinterpret_cast<char const*>(&bfReserved2), sizeof(bfReserved2));
@@ -48,11 +51,14 @@ namespace bmp {
     };
 
     struct CoreHeader {
-        std::uint32_t bcSize = sizeof(CoreHeader);
+        std::uint32_t bcSize = Size;
         std::uint16_t bcWidth = 0;
         std::uint16_t bcHeight = 0;
         std::uint16_t bcPlanes = 1;
         std::uint16_t bcBitCount = 24;
+
+        static constexpr size_t Size = sizeof(bcSize) + sizeof(bcWidth) +
+                                       sizeof(bcHeight) + sizeof(bcPlanes) + sizeof(bcBitCount);
 
         std::ostream& write(std::ostream& stream) {
             stream.write(reinterpret_cast<char const*>(&bcSize), sizeof(bcSize));
@@ -72,7 +78,7 @@ namespace bmp {
         chdr.bcHeight = img.height;
         chdr.bcBitCount = 24;
 
-        fhdr.bfOffBits = sizeof(FileHeader) + chdr.bcSize;
+        fhdr.bfOffBits = FileHeader::Size + chdr.bcSize;
         fhdr.bfSize = fhdr.bfOffBits + (chdr.bcWidth*chdr.bcHeight*(chdr.bcBitCount >> 3));
 
         if (!fhdr.write(stream))
