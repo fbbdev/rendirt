@@ -49,14 +49,33 @@ do the trick.
 
 ## It works!
 
-This command will load a STL model and save the rendered image as `render.bmp`
+This command will load the given STL model and save the rendered image as `render.tiff`
 in the current directory:
 ```sh
 $ build/examples/render path/to/file.stl
 ```
 
 Interesting test models can be downloaded [here](http://people.sc.fsu.edu/~jburkardt/data/stla/stla.html). They're not
-included in this repository because size and LGPL.
+included in this repository because of size and licensing.
+
+Four sample images, one for each predefined shader, are included in folder
+[examples/images](examples/images).
+
+### Depth shader
+
+![Image rendered with depth shader](examples/images/depth.png)
+
+### Position shader
+
+![Image rendered with position shader](examples/images/position.png)
+
+### Normal shader
+
+![Image rendered with normal shader](examples/images/normal.png)
+
+### Diffuse directional lighting shader
+
+![Image rendered with diffuse directional shader](examples/images/diffuseDirectional.png)
 
 ## Documentation
 
