@@ -20,5 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+sdl2 = dependency('sdl2', required: false)
+
 executable('render', 'render.cpp',
-  dependencies: rendirt_dep)
+  dependencies: rendirt)
+
+if sdl2.found()
+  executable('animation', 'animation.cpp',
+    dependencies: [rendirt, sdl2])
+endif

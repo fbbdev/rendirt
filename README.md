@@ -49,16 +49,25 @@ do the trick.
 
 ## It works!
 
-This command will load the given STL model and save the rendered image as `render.tiff`
-in the current directory:
+The `render` example will load the given STL model and save the rendered image
+as `render.tiff` in the current directory:
 ```sh
 $ build/examples/render path/to/file.stl
 ```
 
-Interesting test models can be downloaded [here](http://people.sc.fsu.edu/~jburkardt/data/stla/stla.html). They're not
+The `animation` samples requires SDL2. It will load the given model and
+display an animated view. Various parameters can be tweaked by pressing keys,
+see command output for instructions. Decent frame rates can be achieved only
+with the release build (optimization enabled).
+```sh
+$ build/examples/animation path/to/file.stl
+```
+
+Interesting test models can be downloaded
+[here](http://people.sc.fsu.edu/~jburkardt/data/stla/stla.html). They're not
 included in this repository because of size and licensing.
 
-Four sample images, one for each predefined shader, are included in folder
+Four sample renders, one for each predefined shader, are included in folder
 [examples/images](examples/images).
 
 ### Depth shader
@@ -79,10 +88,9 @@ Four sample images, one for each predefined shader, are included in folder
 
 ## Documentation
 
-Please read the [header](rendirt.hpp) and
-[examples](examples) for now, they're short and not very
-complicated. I'll add some documentation as soon as I have time and feel
-like it (that may easily mean never, though).
+Please read the [header](rendirt.hpp) and [examples](examples) for now, they're
+short and not very complicated. I'll add some documentation as soon as I have
+time and feel like it (that may easily mean never, though).
 
 ## License
 

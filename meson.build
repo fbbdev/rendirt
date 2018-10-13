@@ -40,7 +40,7 @@ rendirt_lib = library('rendirt', rendirt_sources,
 
 install_headers('rendirt.hpp')
 
-rendirt_dep = declare_dependency(
+rendirt = declare_dependency(
   include_directories: incdir,
   link_with: rendirt_lib)
 
