@@ -28,6 +28,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <istream>
@@ -122,22 +123,29 @@ using Color = glm::vec<4, uint8_t>;
 
 using Shader = std::function<Color(glm::vec3 /* frag */, glm::vec3 /* pos */, glm::vec3 /* normal */)>;
 
+template<typename T>
 struct Image {
-    constexpr Image(Color* buf, size_t w, size_t h)
+    constexpr Image(T* buf, size_t w, size_t h)
         : buffer(buf), width(w), height(h), stride(w)
         {}
 
-    constexpr Image(Color* buf, size_t w, size_t h, size_t s)
+    constexpr Image(T* buf, size_t w, size_t h, size_t s)
         : buffer(buf), width(w), height(h), stride(s)
         {}
 
-    void clear(Color color);
+    void clear(T color);
 
-    Color* buffer;
+    T* buffer;
     size_t width;
     size_t height;
     size_t stride;
 };
+
+template<typename T>
+void Image<T>::clear(T color) {
+    for (T *p = buffer, *end = buffer + height*stride; p != end; p += stride)
+        std::fill(p, p + width, color);
+}
 
 enum CullingMode : uint8_t {
     CullNone = 0,
@@ -148,7 +156,7 @@ enum CullingMode : uint8_t {
 };
 
 // Returns number of faces actually rendered
-size_t render(Image const& image, Model const& model,
+size_t render(Image<Color> const& color, Image<float> const& depth, Model const& model,
               glm::mat4 const& view, glm::mat4 const& projection,
               Shader const& shader, CullingMode cullingMode = CullCW);
 

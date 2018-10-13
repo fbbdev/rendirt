@@ -34,6 +34,7 @@
 #include <glm/gtx/normal.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cstdint>
 #include <numeric>
@@ -260,23 +261,17 @@ char const* Model::errorString(Error err) {
     return strings[(unsigned int) err];
 }
 
-// Image methods
-void Image::clear(Color color) {
-    for (Color *p = buffer, *end = buffer + height*stride; p != end; p += stride)
-        std::fill(p, p + width, color);
-}
-
 // Renderer
-size_t rendirt::render(Image const& image, Model const& model,
+size_t rendirt::render(Image<Color> const& color, Image<float> const& depth, Model const& model,
                        glm::mat4 const& view, glm::mat4 const& projection,
                        Shader const& shader, CullingMode cullingMode)
 {
+    assert(color.width == depth.width && color.height == depth.height);
+
     size_t faceCount = 0;
 
-    std::vector<float> depth(image.width*image.height, 1.0f);
-
     using vec2s = glm::vec<2, size_t>;
-    vec2s imgSize(image.width, image.height);
+    vec2s imgSize(color.width, color.height);
     glm::vec2 imgSizef(imgSize);
 
     glm::mat4 viewProj = projection * view;
@@ -343,10 +338,10 @@ size_t rendirt::render(Image const& image, Model const& model,
 
                 // Test if inside triangle, then depth test
                 if (lambda.x >= 0.0f && lambda.y >= 0.0f && lambda.z >= 0.0f &&
-                    z > -1.0f && z < depth[y*image.width + x])
+                    z > -1.0f && z < depth.buffer[y*depth.stride + x])
                 {
-                    depth[y*image.width + x] = z;
-                    image.buffer[y*image.stride + x] = shader(glm::vec3(sample, z), pos, face.normal);
+                    depth.buffer[y*depth.stride + x] = z;
+                    color.buffer[y*color.stride + x] = shader(glm::vec3(sample, z), pos, face.normal);
                 }
             }
         }

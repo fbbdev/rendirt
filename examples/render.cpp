@@ -30,7 +30,7 @@
 #include <iostream>
 #include <fstream>
 
-using namespace rendirt;
+namespace rd = rendirt;
 
 std::ostream& operator<<(std::ostream& stream, glm::vec3 const& v) {
     return stream << "vec3{" << v.x << ", " << v.y << ", " << v.z << "}";
@@ -58,15 +58,15 @@ int main(int argc, char* argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
 
     // Load model from STL file. Let rendirt guess the format
-    Model model;
-    Model::Error err = model.loadSTL(*source);
+    rd::Model model;
+    rd::Model::Error err = model.loadSTL(*source);
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    if (err != Model::Ok) {
+    if (err != rd::Model::Ok) {
         std::cerr << "Model load failed after "
                   << std::chrono::duration_cast<frac_ms>(end - start).count() << " ms\n"
-                  << "Error: " << Model::errorString(err)
+                  << "Error: " << rd::Model::errorString(err)
                   << std::endl;
         return -1;
     }
@@ -76,13 +76,17 @@ int main(int argc, char* argv[]) {
               << "Face count: " << model.size() << '\n'
               << "Bounding box: { " << model.boundingBox().from << ", " << model.boundingBox().to << " }\n"
               << "Center: " << model.center() << '\n'
-              << "Memory usage: " << double(model.capacity()*sizeof(Face))/1024.0 << " KB"
+              << "Memory usage: " << double(model.capacity()*sizeof(rd::Face))/1024.0 << " KB"
               << std::endl;
 
-    // Create image 800x600 px image
-    std::vector<Color> buffer(800*600);
-    Image img(&buffer.front(), 800, 600);
-    img.clear(Color(0, 0, 0, 255));
+    // Create 800x600 px image and depth buffer
+    std::vector<rd::Color> colorBuffer(800*600);
+    rd::Image<rd::Color> img(colorBuffer.data(), 800, 600);
+    img.clear(rd::Color(0, 0, 0, 255));
+
+    std::vector<float> depthBuffer(800*600);
+    rd::Image<float> depth(depthBuffer.data(), 800, 600);
+    depth.clear(1.0f); // Depth buffer must be cleared to 1.0f
 
     // Precalculate useful values
     float aspect = float(img.width) / float(img.height);
@@ -96,31 +100,31 @@ int main(int argc, char* argv[]) {
     // Use the center of the bounding box as origin.
     // Place camera at (r=|diagonal|, theta=45deg, phi=45deg).
     // Look into the center of the bounding box.
-    Camera view(
+    rd::Camera view(
         model.center() + glm::length(diagonal)*glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f)),
         model.center(),
         { 0.0f, 1.0f, 0.0f });
 
     // Build orthographic projection and ensure it fits the model
-    /*Projection proj(
-        Projection::Orthographic,
+    /*rd::Projection proj(
+        rd::Projection::Orthographic,
         -maxDim*aspect, maxDim*aspect,
         -maxDim, maxDim,
         0.0f, 2.0f*glm::length(diagonal));*/
 
     // Build perspective projection with 60deg fov
-    Projection proj(
-        Projection::Perspective,
+    rd::Projection proj(
+        rd::Projection::Perspective,
         60.0f/180.0f*glm::pi<float>(), img.width, img.height,
         0.1f, 2.0f*glm::length(diagonal));
 
     start = std::chrono::high_resolution_clock::now();
 
-    size_t count = rendirt::render(img, model, view, proj,
-        // shaders::depth);
-        // shaders::position(model.boundingBox()));
-        // shaders::normal);
-        shaders::diffuseDirectional(glm::vec3(0.0f, -1.0f, -1.0f), Color(40, 40, 40, 255), Color(200, 200, 200, 255)));
+    size_t count = rd::render(img, depth, model, view, proj,
+        // rd::shaders::depth);
+        // rd::shaders::position(model.boundingBox()));
+        // rd::shaders::normal);
+        rd::shaders::diffuseDirectional(glm::vec3(0.0f, -1.0f, -1.0f), rd::Color(40, 40, 40, 255), rd::Color(200, 200, 200, 255)));
 
     end = std::chrono::high_resolution_clock::now();
 
@@ -142,7 +146,7 @@ int main(int argc, char* argv[]) {
 
     for (size_t i = 0, end = img.height*img.stride; i < end; i += img.stride - img.width)
         for (size_t rend = i + img.width; i < rend; ++i)
-            img.buffer[i] = Color(RGB16(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
+            img.buffer[i] = rd::Color(RGB16(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
 
     if (!tiff::writeTIFF(output, img)) {
         std::cerr << "./render.tiff: write failed: " << strerror(errno) << std::endl;

@@ -288,7 +288,7 @@ namespace tiff {
         }
     };
 
-    std::ostream& writeTIFF(std::ostream& stream, rendirt::Image const& img) {
+    std::ostream& writeTIFF(std::ostream& stream, rendirt::Image<rendirt::Color> const& img) {
         std::uint16_t fieldCount = 14;
         std::uint32_t valueOffset =
             Header::Size + sizeof(fieldCount) + fieldCount*IFDEntry::Size + sizeof(std::uint32_t);
