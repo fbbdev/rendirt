@@ -251,7 +251,7 @@ Model::Error Model::loadSTL(std::istream& stream, bool useNormals, Mode mode) {
 }
 
 char const* Model::errorString(Error err) {
-    static char const* strings[ErrorCount] = {
+    static char const* strings[LastError + 1] = {
         "no error",
         "invalid token",
         "unexpected token",

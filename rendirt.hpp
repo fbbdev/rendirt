@@ -56,7 +56,7 @@ public:
         FileTruncated,
         GuessFailed,
 
-        ErrorCount
+        LastError = GuessFailed
     };
 
     enum Mode : uint8_t {
@@ -121,7 +121,7 @@ struct Camera : glm::mat4 {
 
 using Color = glm::vec<4, uint8_t>;
 
-using Shader = std::function<Color(glm::vec3 /* frag */, glm::vec3 /* pos */, glm::vec3 /* normal */)>;
+using Shader = std::function<Color(glm::vec3 frag, glm::vec3 pos, glm::vec3 normal)>;
 
 template<typename T>
 struct Image {
