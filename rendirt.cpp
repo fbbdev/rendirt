@@ -38,6 +38,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 
 using namespace rendirt;
@@ -89,8 +90,8 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
             return UnexpectedToken;
     }
 
-    // Read (and ignore) model name
-    stream >> tok;
+    // Read (and ignore) model name and comment line
+    stream.ignore(std::numeric_limits<std::streamsize>::max(), stream.widen('\n'));
     if (!stream)
         return FileTruncated;
 
