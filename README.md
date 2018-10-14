@@ -158,7 +158,6 @@ namespace.
   - [`using rendirt::Color`](#using-rendirtcolor)
   - [Utilities](#utilities)
   - [Shaders](#shaders)
-  - [A simple example](#a-simple-example)
 
 ## `rendirt::render()`
 
