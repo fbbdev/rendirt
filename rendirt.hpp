@@ -87,7 +87,7 @@ public:
 private:
     AABB boundingBox_;
 
-    static Error loadTextSTL(std::istream& stream, Model& model, bool useNormals);
+    static Error loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified);
     static Error loadBinarySTL(std::istream& stream, Model& model, bool useNormals, size_t skipped);
 };
 

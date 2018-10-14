@@ -61,10 +61,10 @@ void Model::updateBoundingBox() {
 
 namespace {
     // STL format parsing helpers
-    size_t skipWhitespace(std::istream& stream) {
+    size_t skipWhitespace(std::istream& stream, size_t limit = -1) {
         size_t count = 0;
 
-        while (std::isspace(stream.peek())) {
+        while (std::isspace(stream.peek()) && count < limit) {
             stream.ignore();
             ++count;
         }
@@ -73,12 +73,23 @@ namespace {
     }
 } /* namespace */
 
-Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNormals) {
+Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified) {
     std::string tok;
 
+    stream >> std::skipws;
+
+    if (!verified) {
+        // Read and verify 'solid' signature
+        stream >> tok;
+        if (!stream) // If error or eof, we have a problem
+            return FileTruncated;
+        else if (tok != "solid")
+            return UnexpectedToken;
+    }
+
     // Read (and ignore) model name
-    stream >> std::skipws >> tok;
-    if (!stream) // If error or eof, we have a problem
+    stream >> tok;
+    if (!stream)
         return FileTruncated;
 
     model.clear();
@@ -232,21 +243,28 @@ Model::Error Model::loadSTL(std::istream& stream, bool useNormals, Mode mode) {
     size_t skipped = 0;
 
     if (mode == Guess) {
-        char signature[5];
+        char signature[6];
 
-        skipped += skipWhitespace(stream);
-        if (skipped > 75)
+        skipped += skipWhitespace(stream, 80);
+        if (skipped == 80)
             return GuessFailed;
 
-        stream.read(signature, 5);
-        if (stream.gcount() < 5)
+        size_t available = glm::min(size_t(6), 80 - skipped);
+        stream.read(signature, available);
+        if (stream.gcount() < std::streamsize(available))
             return FileTruncated;
 
-        skipped += 5;
-        mode = std::equal(signature, signature + 5, "solid") ? Text : Binary;
+        skipped += available;
+
+        if (available == 6 && std::equal(signature, signature + 5, "solid") && std::isspace(signature[5]))
+            mode = Text;
+        else if (available < 6 && std::equal(signature, signature + available, "solid"))
+            return GuessFailed;
+        else
+            mode = Binary;
     }
 
-    return (mode == Text) ? loadTextSTL(stream, *this, useNormals)
+    return (mode == Text) ? loadTextSTL(stream, *this, useNormals, skipped > 0)
                           : loadBinarySTL(stream, *this, useNormals, skipped);
 }
 
