@@ -7,13 +7,13 @@ From this point of view, *rendirt* means *render it*.
 
 **But beware!** *rendirt* also stands for *dirty renderer*. This thing is as
 simple as possible, quite inflexible and completely unoptimized. Clocking in
-at ~500 lines of code, it does its (very limited) work in reasonable time and
+at ~400 LOCs, it does its (very limited) work in reasonable time and
 that's all. This is not meant to be an example of good practice in graphics
 programming. Decent speed is only achieved with optimizations enabled. Still,
-the debug build manages to render ~400k tris at 800x600 px in about 1 second
-and simpler models in less than half a second. It becomes orders of magnitude
-faster when compiler-optimized. *(DISCLAIMER: those are not accurate measures,
-just an average execution time to give an idea)*.
+the debug build manages to render ~400k tris at 800x600 px in less than 1 second
+and simpler models in less than 100 milliseconds. It becomes one order of
+magnitude faster when compiler-optimized. *(DISCLAIMER: those are not accurate
+measures, just a average execution times to give an idea)*.
 
 The renderer implements a fixed-pipeline vertex processor with optional
 face culling (enabled by default) and a programmable fragment shader.
@@ -21,7 +21,7 @@ The fragment shader function has access to fragment position and depth,
 interpolated object-space position and normal. Some predefined shaders are
 provided.
 
-The wonderful [glm](https://glm.g-truc.net/0.9.9/index.html) library is used
+The awesome [glm](https://glm.g-truc.net/0.9.9/index.html) library is used
 extensively. Headers for its 0.9.9.2 version are included in the repository,
 but any other recent version will do. The license can be found [below](#glm).
 
