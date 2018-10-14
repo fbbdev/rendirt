@@ -310,8 +310,8 @@ namespace tiff {
         SamplesPerPixel(4).write(stream);
         RowsPerStrip(img.height).write(stream);
         StripByteCounts<1>(img.width*img.height*sizeof(rendirt::Color)).write(stream);
-        XResolution(valueOffset + BitsPerSample<4>::ValueSize).write(stream); // FIXME: value offset
-        YResolution(valueOffset + BitsPerSample<4>::ValueSize + XResolution::ValueSize).write(stream); // FIXME: value offset
+        XResolution(valueOffset + BitsPerSample<4>::ValueSize).write(stream);
+        YResolution(valueOffset + BitsPerSample<4>::ValueSize + XResolution::ValueSize).write(stream);
         ResolutionUnit(ResolutionUnit::Inch).write(stream);
         ExtraSamples<1>(SampleInterpretation::AssociatedAlpha).write(stream);
 
