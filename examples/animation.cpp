@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
     SDL_Texture* texture;
 
     int width = 320, height = 320;
-    unsigned int lastFrame = 0, timeout = 50;
+    unsigned int lastFrame = 0, timeout = 0;
     bool throttle = true;
 
     // Performance counters
@@ -219,8 +219,8 @@ int main(int argc, char* argv[]) {
 
         // Frame throttling. Target 25fps
         unsigned int ticks = SDL_GetTicks();
-        if (throttle && ticks - lastFrame < 40) {
-            timeout = 40 - (ticks - lastFrame);
+        if (throttle && ticks - lastFrame < 35) {
+            timeout = 35 - (ticks - lastFrame);
             continue;
         }
 
@@ -269,7 +269,7 @@ int main(int argc, char* argv[]) {
         ++frames;
         ticks = SDL_GetTicks();
 
-        timeout = throttle ? (40 - glm::min(ticks - lastFrame, 40u)) : 0;
+        timeout = throttle ? (35 - glm::min(ticks - lastFrame, 35u)) : 0;
 
         if (ticks - lastReport > reportTimeout) {
             std::cerr << "FPS: " << double(frames)/((ticks - lastReport)*0.001) << "; "
