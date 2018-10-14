@@ -254,7 +254,7 @@ int main(int argc, char* argv[]) {
             img.clear(rd::Color(0, 0, 0, 255));
             depth.clear(1.0f);
 
-            trisPerFrame += (rd::render(img, depth, model, view, *proj, *currentShader, *currentCullingMode)
+            trisPerFrame += (rd::render(img, depth, model, *proj * view, *currentShader, *currentCullingMode)
                 - trisPerFrame) / (frames+1) ;
 
             SDL_UnlockTexture(texture);

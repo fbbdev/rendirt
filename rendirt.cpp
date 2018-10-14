@@ -263,8 +263,8 @@ char const* Model::errorString(Error err) {
 }
 
 // Renderer
-size_t rendirt::render(Image<Color> const& color, Image<float> const& depth, Model const& model,
-                       glm::mat4 const& view, glm::mat4 const& projection,
+size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
+                       Model const& model, glm::mat4 const& modelViewProj,
                        Shader const& shader, CullingMode cullingMode)
 {
     assert(color.width == depth.width && color.height == depth.height);
@@ -274,18 +274,14 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const& depth, Mod
     using vec2s = glm::vec<2, size_t>;
     const vec2s imgSize(color.width, color.height);
     const glm::vec2 imgSizef(imgSize);
-    const glm::vec2 sampleStep = (glm::vec2(1.5f, 1.5f)/imgSizef - 0.5f) * glm::vec2(2.0f, -2.0f) -
-                                 (glm::vec2(0.5f, 0.5f)/imgSizef - 0.5f) * glm::vec2(2.0f, -2.0f);
 
-    const glm::mat4 viewProj = projection * view;
-    // XXX: Simplified form of the equation for sample position below
-    //glm::vec2 sampleStep = glm::vec2(2.0f, -2.0f)/imgSizef - glm::vec2(2.0f, -2.0f);
+    glm::vec2 sampleStep = glm::vec2(2.0f, -2.0f)/imgSizef;
 
     for (auto const& face: model) {
         glm::vec4 clipf[3] = {
-            viewProj * glm::vec4(face.vertex[0], 1.0f),
-            viewProj * glm::vec4(face.vertex[1], 1.0f),
-            viewProj * glm::vec4(face.vertex[2], 1.0f)
+            modelViewProj * glm::vec4(face.vertex[0], 1.0f),
+            modelViewProj * glm::vec4(face.vertex[1], 1.0f),
+            modelViewProj * glm::vec4(face.vertex[2], 1.0f)
         };
 
         clipf[0] /= clipf[0].w; clipf[1] /= clipf[1].w; clipf[2] /= clipf[2].w;

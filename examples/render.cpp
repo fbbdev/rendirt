@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
 
     start = std::chrono::high_resolution_clock::now();
 
-    size_t count = rd::render(img, depth, model, view, proj,
+    size_t count = rd::render(img, depth, model, proj*view,
         // rd::shaders::depth);
         // rd::shaders::position(model.boundingBox()));
         // rd::shaders::normal);

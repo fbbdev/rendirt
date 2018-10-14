@@ -156,8 +156,8 @@ enum CullingMode : uint8_t {
 };
 
 // Returns number of faces actually rendered
-size_t render(Image<Color> const& color, Image<float> const& depth, Model const& model,
-              glm::mat4 const& view, glm::mat4 const& projection,
+size_t render(Image<Color> const& color, Image<float> const& depth,
+              Model const& model, glm::mat4 const& modelViewProj,
               Shader const& shader, CullingMode cullingMode = CullCW);
 
 namespace shaders {
