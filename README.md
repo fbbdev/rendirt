@@ -175,28 +175,28 @@ size_t render(Image<Color> const& color, Image<float> const& depth,
 
 ### Arguments
 
-  - `color`: a valid buffer of type [`Image<Color>`](#struct-rendirt-imaget)
+  - `color`: a valid buffer of type [`Image<Color>`](#struct-rendirtimaget)
     that will be filled with image data.
-  - `depth`: a valid buffer of type [`Image<float>`](#struct-rendirt-imaget)
+  - `depth`: a valid buffer of type [`Image<float>`](#struct-rendirtimaget)
     that will be used for depth testing. This buffer *must* have the same width
     and height as the `color` one: debug builds use `assert` to ensure this
     condition holds; relese builds just assume this is the case. When doing a
     clean render, this buffer must be reset to a value of `1.0f` (e.g. by
     calling `depth.clear(1.0f)`).
-  - `model`: a [`Model`](#class-rendirt-model) instance containing mesh data to
+  - `model`: a [`Model`](#class-rendirtmodel) instance containing mesh data to
     be rendered.
   - `modelViewProj`: a 4x4 matrix to be used for vertex processing. It should
     be the product, in order, of the projection matrix, the view matrix, and
     the model matrix when applicable.
   - `shader`: the fragment shader function (see documentation for the
-    [`Shader`](#class-rendirt-shader) type).
-  - `cullingMode`: a value from the [`CullingMode`](#enum-rendirt-cullingmode)
+    [`Shader`](#using-rendirtshader) type).
+  - `cullingMode`: a value from the [`CullingMode`](#enum-rendirtcullingmode)
     enum that specifies whether face culling should be performed, and how. The
     default value is `CullCW`.
 
 ### Return value
 
-The number of triangles actually rendered (i.e. not culled).
+The number of triangles actually rendered (i.e. not culled or clipped).
 
 ## `enum rendirt::CullingMode`
 
@@ -299,12 +299,12 @@ using Shader = std::function<Color(glm::vec3 frag, glm::vec3 pos, glm::vec3 norm
 
 ### Return value
 
-The [`Color`](#using-rendirt-color) of the fragment as computed by the shader.
+The [`Color`](#using-rendirtcolor) of the fragment as computed by the shader.
 
 ## `class rendirt::Model`
 
 The `Model` class is a thin wrapper around `std::vector<Face>` representing
-a triangle mesh as a list of [`Face`](#struct-rendirt-face)s. Additional
+a triangle mesh as a list of [`Face`](#struct-rendirtface)s. Additional
 methods for computing the bounding box and loading STL files are provided.
 
 ```c++
@@ -393,7 +393,7 @@ All `std::vector<Face>` constructors are inherited with public access.
 AABB const& Model::boundingBox() const;
 ```
 
-Returns a cached [`AABB`](#struct-rendirt-aabb) instance whose value
+Returns a cached [`AABB`](#struct-rendirtaabb) instance whose value
 represents the bounding box of the mesh (if the cache is up to date,
 see `updateBoundingBox`).
 
