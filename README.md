@@ -8,7 +8,7 @@ From this point of view, *rendirt* means *render it*.
 **But beware!** *rendirt* also stands for *dirty renderer*. This thing is as
 simple as possible, quite inflexible and mostly unoptimized. Clocking in
 at ~400 LOCs, it does its (very limited) work in reasonable time and
-that's all. This is not meant to be an example of good practice in graphics
+that's all. This is not meant to be an example of state-of-the-art graphics
 programming. Decent speed is only achieved with compiler optimizations enabled. Still, the debug build manages to render ~400k tris at 800x600 px in less than
 1 second and simpler models in less than 100 milliseconds. It becomes one order
 of magnitude faster when compiler-optimized. *(DISCLAIMER: those are not
@@ -24,12 +24,14 @@ The awesome [glm](https://glm.g-truc.net/0.9.9/index.html) library is used
 extensively. Headers for its 0.9.9.2 version are included in the repository,
 but any other recent version will do. The license can be found [below](#glm).
 
-# Contents
+## Contents
 
   1. [Building](#building)
-  2. [Examples and demo images](#it-works)
-  3. [Documentation](#documentation)
-  4. [License](#license)
+  2. [It works!](#it-works)
+  3. [Show me the code](#show-me-the-code)
+  4. [A picture is worth a thousand words](#a-picture-is-worth-a-thousand-words)
+  5. [API Reference](#api-reference)
+  6. [License](#license)
 
 # Building
 
@@ -73,26 +75,73 @@ Interesting test models can be downloaded
 [here](http://people.sc.fsu.edu/~jburkardt/data/stla/stla.html). They're not
 included in this repository because of size and licensing.
 
-Four sample renders, one for each predefined shader, are included in folder
-[examples/images](examples/images).
+# Show me the code!
 
-## Depth shader
+Here it comes! This is the bare minimum to obtain an image. For more details
+and variations look into the [examples](examples) folder.
+
+```c++
+namespace rd = rendirt;
+
+std::ifstream file("/path/to/file.stl");
+if (!file) {
+    // Error handling
+}
+
+rd::Model model;
+rd::Model::Error err = model.loadSTL(file);
+if (err != rd::Model::Ok) {
+    // Error handling
+}
+
+file.close();
+
+std::vector<rd::Color> colorBuffer(800*600);
+std::vector<float> depthBuffer(800*600);
+Image<rd::Color> image(colorBuffer.data(), 800, 600);
+Image<float> depth(depthBuffer.data(), 800, 600);
+
+rd::Camera view(
+    { 0.0f, 0.0f, 5.0f },
+    { 0.0f, 0.0f, 0.0f },
+    { 0.0f, 1.0f, 0.0f });
+
+rd::Projection proj(
+    rd::Projection::Perspective,
+    glm::half_pi<float>(),
+    width, height,
+    0.1f, 100.0f);
+
+size_t faceCount = rd::render(
+    image, depth, model, proj * view,
+    rd::shaders::position(model.boundingBox()));
+
+// Do something with the image
+```
+
+# A picture is worth a thousand words
+
+Four pictures should add up to a whopping four thousand words then.
+Sample renders, one for each predefined shader, are included in folder
+[examples/images](examples/images). Here they are:
+
+### Depth shader
 
 ![Image rendered with depth shader](examples/images/depth.png)
 
-## Position shader
+### Position shader
 
 ![Image rendered with position shader](examples/images/position.png)
 
-## Normal shader
+### Normal shader
 
 ![Image rendered with normal shader](examples/images/normal.png)
 
-## Diffuse directional lighting shader
+### Diffuse directional lighting shader
 
 ![Image rendered with diffuse directional shader](examples/images/diffuseDirectional.png)
 
-# Documentation
+# API Reference
 
 To use the library, make sure that *glm* is available in the include path, then
 include `rendirt.hpp` and link with `rendirt.cpp` or with the static library
@@ -580,29 +629,37 @@ the line of sight from the eye point to the reference point.
 
 Some predefined shaders are available under the `rendirt::shaders` namespace.
 
+### `rendirt::shaders::depth`
+
 ```c++
-Shader rendirt::shaders::depth;
+Shader depth;
 ```
 
 Scales the depth value of the fragment from range [-1,1] to range [0,1] and
 colors the fragment according to the rule:
 `color = (255*depth, 255*depth, 255*depth, 255)`.
 
+### `rendirt::shaders::position()`
+
 ```c++
-Shader rendirt::shaders::position(AABB bbox);
+Shader position(AABB bbox);
 ```
 
 Generates a shader that scales the interpolated position to make it go from
 (0, 0, 0) at bbox.from up to (1, 1, 1) at bbox.to. The fragment is then colored
 as follows: `color = (255*pos.x, 255*pos.y, 255*pos.z, 255)`.
 
+### `rendirt::shaders::normal`
+
 ```c++
-Shader rendirt::shaders::normal;
+Shader normal;
 ```
 
 Expects the face normal to be correctly normalized. Colors the fragment
 according to the rule:
 `color = (255*normal.x, 255*normal.y, 255*normal.z, 255)`.
+
+### `rendirt::shaders::diffuseDirectional()`
 
 ```c++
 Shader diffuseDirectional(glm::vec3 dir, Color ambient, Color diffuse);
@@ -615,51 +672,6 @@ to the equation:
 ```
 color = clamp(ambient + max(0, dot(-normalize(dir), normal))*diffuse, 0, 255);
 ```
-
-## A simple example
-
-The following code shows briefly how to load and render a model.
-
-```c++
-namespace rd = rendirt;
-
-std::ifstream file("/path/to/file.stl");
-if (!file) {
-    // Error handling
-}
-
-rd::Model model;
-rd::Model::Error err = model.loadSTL(file);
-if (err != rd::Model::Ok) {
-    // Error handling
-}
-
-file.close();
-
-std::vector<rd::Color> colorBuffer(800*600);
-std::vector<float> depthBuffer(800*600);
-Image<rd::Color> image(colorBuffer.data(), 800, 600);
-Image<float> depth(depthBuffer.data(), 800, 600);
-
-rd::Camera view(
-    { 0.0f, 0.0f, 5.0f },
-    { 0.0f, 0.0f, 0.0f },
-    { 0.0f, 1.0f, 0.0f });
-
-rd::Projection proj(
-    rd::Projection::Perspective,
-    glm::half_pi<float>(),
-    width, height,
-    0.1f, 100.0f);
-
-size_t faceCount = rd::render(
-    image, depth, model, proj * view,
-    rd::shaders::position(model.boundingBox()));
-
-// Do something with the image
-```
-
-See the [examples](examples) folder for more detailed code.
 
 # License
 
