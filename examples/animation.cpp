@@ -35,6 +35,9 @@ int main(int argc, char* argv[]) {
     rd::Model model;
     rd::Model::Error err = model.loadSTL(*source);
 
+    if (source == &file)
+        file.close();
+
     auto end = std::chrono::high_resolution_clock::now();
 
     if (err != rd::Model::Ok) {

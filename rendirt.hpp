@@ -106,8 +106,8 @@ struct Projection : glm::mat4 {
         : glm::mat4(glm::perspectiveFov(fov, width, height, near, far))
         {}
 
-    explicit Projection(OrthographicTag, float left, float right, float bottom, float top, float zNear, float zFar)
-        : glm::mat4(glm::ortho(left, right, bottom, top, zNear, zFar))
+    explicit Projection(OrthographicTag, float left, float right, float bottom, float top, float near, float far)
+        : glm::mat4(glm::ortho(left, right, bottom, top, near, far))
         {}
 };
 
