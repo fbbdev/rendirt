@@ -24,14 +24,14 @@ The awesome [glm](https://glm.g-truc.net/0.9.9/index.html) library is used
 extensively. Headers for its 0.9.9.2 version are included in the repository,
 but any other recent version will do. The license can be found [below](#glm).
 
-## Contents
+# Contents
 
   1. [Building](#building)
   2. [Examples and demo images](#it-works)
   3. [Documentation](#documentation)
   4. [License](#license)
 
-## Building
+# Building
 
 *rendirt* uses the meson build system for peace of mind. This is not strictly
 necessary since the project consists of [a single header](rendirt.hpp)
@@ -53,7 +53,7 @@ If you can't use *meson* or prefer not to, compiling and linking each *cpp*
 file from the [examples folder](examples) together with `rendirt.cpp` will
 do the trick.
 
-## It works!
+# It works!
 
 The `render` example will load the given STL model and save the rendered image
 as `render.tiff` in the current directory:
@@ -76,42 +76,42 @@ included in this repository because of size and licensing.
 Four sample renders, one for each predefined shader, are included in folder
 [examples/images](examples/images).
 
-### Depth shader
+## Depth shader
 
 ![Image rendered with depth shader](examples/images/depth.png)
 
-### Position shader
+## Position shader
 
 ![Image rendered with position shader](examples/images/position.png)
 
-### Normal shader
+## Normal shader
 
 ![Image rendered with normal shader](examples/images/normal.png)
 
-### Diffuse directional lighting shader
+## Diffuse directional lighting shader
 
 ![Image rendered with diffuse directional shader](examples/images/diffuseDirectional.png)
 
-## Documentation
+# Documentation
 
 To use the library, make sure that *glm* is available in the include path, then
 include `rendirt.hpp` and link with `rendirt.cpp` or with the static library
 produced by the build system. The API is contained within the `rendirt`
 namespace.
 
-  - [`rendirt::render()`](#rendirt-render-)
-  - [`enum rendirt::CullingMode`](#enum-rendirt-cullingmode)
-  - [`struct rendirt::Image<T>`](#struct-rendirt-imaget)
-  - [`using rendirt::Shader`](#using-rendirt-shader)
-  - [`class rendirt::Model`](#class-rendirt-model)
-  - [`struct rendirt::Face`](#struct-rendirt-face)
-  - [`struct rendirt::AABB`](#struct-rendirt-aabb)
-  - [`using rendirt::Color`](#using-rendirt-color)
+  - [`rendirt::render()`](#rendirtrender)
+  - [`enum rendirt::CullingMode`](#enum-rendirtcullingmode)
+  - [`struct rendirt::Image<T>`](#struct-rendirtimaget)
+  - [`using rendirt::Shader`](#using-rendirtshader)
+  - [`class rendirt::Model`](#class-rendirtmodel)
+  - [`struct rendirt::Face`](#struct-rendirtface)
+  - [`struct rendirt::AABB`](#struct-rendirtaabb)
+  - [`using rendirt::Color`](#using-rendirtcolor)
   - [Utilities](#utilities)
   - [Shaders](#shaders)
   - [A simple example](#a-simple-example)
 
-### `rendirt::render()`
+## `rendirt::render()`
 
 The main entry point is the `rendirt::render` function. It takes in all
 necessary resources and parameters and fills the `color` buffer with the
@@ -125,7 +125,7 @@ size_t render(Image<Color> const& color, Image<float> const& depth,
               Shader const& shader, CullingMode cullingMode = CullCW);
 ```
 
-#### Arguments
+### Arguments
 
   - `color`: a valid buffer of type [`Image<Color>`](#struct-rendirt-imaget)
     that will be filled with image data.
@@ -146,11 +146,11 @@ size_t render(Image<Color> const& color, Image<float> const& depth,
     enum that specifies whether face culling should be performed, and how. The
     default value is `CullCW`.
 
-#### Return value
+### Return value
 
 The number of triangles actually rendered (i.e. not culled).
 
-### `enum rendirt::CullingMode`
+## `enum rendirt::CullingMode`
 
 Values of the `CullingMode` enum specify whether and how face culling is to
 be performed.
@@ -165,7 +165,7 @@ enum CullingMode {
 };
 ```
 
-#### Values
+### Values
 
   - `CullNone`: do not perform face culling.
   - `CullCW`: cull triangles with clockwise
@@ -175,7 +175,7 @@ enum CullingMode {
     triangles with CW winding back-facing).
   - `CullFront`: an alias for `CullCCW` (following the same reasoning).
 
-### `struct rendirt::Image<T>`
+## `struct rendirt::Image<T>`
 
 `Image<T>` instances represent weak references to rectangular buffers of
 elements of type `T`, specified by a pointer to the first element (`buffer`),
@@ -198,7 +198,7 @@ struct Image {
 };
 ```
 
-#### Fields
+### Fields
 
   - `buffer`: pointer to the first element of the buffer.
   - `width`: size, in elements, of a single row.
@@ -206,7 +206,7 @@ struct Image {
   - `stride`: distance, in elements, from the first element of any row to the
     first element of the next
 
-#### Constructors
+### Constructors
 
 ```c++
 explicit constexpr Image(T* buffer, size_t width, size_t height);
@@ -216,7 +216,7 @@ explicit constexpr Image(T* buffer, size_t width, size_t height, size_t stride);
 The two constructors simply assign their arguments to fields of the same name.
 When stride is omitted (first overload) it is made equal to width.
 
-#### Methods
+### Methods
 
 ```c++
 void clear(T value);
@@ -228,7 +228,7 @@ Fills the buffer with the specified value.
 
   - `value`: any value of type T.
 
-### `using rendirt::Shader`
+## `using rendirt::Shader`
 
 The `Shader` type is an alias for a `std::function` type capable of holding
 fragment shader functions. A shader function (or functor) takes as arguments
@@ -240,7 +240,7 @@ possibly other data) to compute the fragment color.
 using Shader = std::function<Color(glm::vec3 frag, glm::vec3 pos, glm::vec3 normal)>;
 ```
 
-#### Arguments
+### Arguments
 
   - `frag`: a 3-float vector equal to the coordinates of the current fragment
     in clip space. The third component is the depth value.
@@ -249,11 +249,11 @@ using Shader = std::function<Color(glm::vec3 frag, glm::vec3 pos, glm::vec3 norm
   - `normal`: a 3-float vector equal to the normal of the triangle to which
     the current fragment belongs.
 
-#### Return value
+### Return value
 
 The [`Color`](#using-rendirt-color) of the fragment as computed by the shader.
 
-### `class rendirt::Model`
+## `class rendirt::Model`
 
 The `Model` class is a thin wrapper around `std::vector<Face>` representing
 a triangle mesh as a list of [`Face`](#struct-rendirt-face)s. Additional
@@ -279,7 +279,7 @@ public:
 };
 ```
 
-#### Types
+### Types
 
 ```c++
 enum Model::Error {
@@ -318,7 +318,7 @@ loader, or ask the loader to detect it automatically. Possible values are:
   - `Model::Text`: input data is in ASCII format.
   - `Model::Binary`: input data is in binary format.
 
-#### Static members
+### Static members
 
 ```c++
 char const* Model::errorString(Error err);
@@ -331,7 +331,7 @@ NULL-terminated string containing a brief description of the error.
 
   - `err`: any value from the `Model::Error` enum.
 
-#### Constructors
+### Constructors
 
 ```c++
 using std::vector<Face>::vector;
@@ -339,7 +339,7 @@ using std::vector<Face>::vector;
 
 All `std::vector<Face>` constructors are inherited with public access.
 
-#### Methods
+### Methods
 
 ```c++
 AABB const& Model::boundingBox() const;
@@ -391,7 +391,7 @@ of facets loaded from the STL file and the cached bounding box is up to date.
     error `Model::GuessFailed`. In this case, it is guaranteed that exactly 80
     bytes have been consumed from the stream.
 
-### `struct rendirt::Face`
+## `struct rendirt::Face`
 
 `Face` instances represent a triangle by specifing its normal vector and three
 vertices. The structure is modeled on the STL format's facet specification.
@@ -403,13 +403,13 @@ struct Face {
 };
 ```
 
-#### Fields
+### Fields
 
   - `normal`: a 3-float vector equal to the normal of the triangle.
   - `vertex`: an array of three 3-float vectors, one for each vertex of the
     triangle.
 
-### `struct rendirt::AABB`
+## `struct rendirt::AABB`
 
 `AABB` instances represent axis-aligned bounding boxes specified by their two
 extreme corners. **WARNING:** most functions in *rendirt* assume each component
@@ -423,12 +423,12 @@ struct AABB {
 };
 ```
 
-#### Fields
+### Fields
 
   - `from`: a 3-float vector equal to the minimal corner of the bounding box.
   - `to`: a 3-float vector equal to the maximal corner of the bounding box.
 
-### `using rendirt::Color`
+## `using rendirt::Color`
 
 The `Color` type is an alias for a *glm* vector of four bytes, capable of
 representing a color in RGBA32 format.
@@ -437,9 +437,9 @@ representing a color in RGBA32 format.
 using Color = glm::vec<4, uint8_t>;
 ```
 
-### Utilities
+## Utilities
 
-#### `struct rendirt::Projection`
+### `struct rendirt::Projection`
 
 ```c++
 struct Projection : glm::mat4 {
@@ -468,7 +468,7 @@ Please not that in all three cases depth buffer precision is affected by the val
 less effective the depth buffer will be at distinguishing between surfaces that
 are near each other.
 
-##### Constructors
+#### Constructors
 
 ```c++
 using glm::mat4::mat;
@@ -531,7 +531,7 @@ first argument.
   - `near`: distance to the near depth clipping plane.
   - `far`: distance to the far depth clipping plane.
 
-#### `struct rendirt::Camera`
+### `struct rendirt::Camera`
 
 ```c++
 struct Camera : glm::mat4 {
@@ -546,7 +546,7 @@ struct Camera : glm::mat4 {
 The `Camera` struct is a wrapper around `glm::mat4` (4x4 float matrix) that
 provides an additional constructor for easy creation of a viewing matrix.
 
-##### Constructors
+#### Constructors
 
 ```c++
 using glm::mat4::mat;
@@ -576,7 +576,7 @@ the line of sight from the eye point to the reference point.
     of the scene.
   - `up`: specifies the direction of the *up* vector.
 
-### Shaders
+## Shaders
 
 Some predefined shaders are available under the `rendirt::shaders` namespace.
 
@@ -616,7 +616,7 @@ to the equation:
 color = clamp(ambient + max(0, dot(-normalize(dir), normal))*diffuse, 0, 255);
 ```
 
-### A simple example
+## A simple example
 
 The following code shows briefly how to load and render a model.
 
@@ -661,7 +661,7 @@ size_t faceCount = rd::render(
 
 See the [examples](examples) folder for more detailed code.
 
-## License
+# License
 
 *rendirt* is distributed under the MIT license.
 
@@ -685,7 +685,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-### glm
+## glm
 
 *glm* files are distributed under the MIT license.
 
