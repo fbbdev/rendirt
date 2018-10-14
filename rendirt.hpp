@@ -125,15 +125,15 @@ using Shader = std::function<Color(glm::vec3 /* frag */, glm::vec3 /* pos */, gl
 
 template<typename T>
 struct Image {
-    constexpr Image(T* buf, size_t w, size_t h)
+    explicit constexpr Image(T* buf, size_t w, size_t h)
         : buffer(buf), width(w), height(h), stride(w)
         {}
 
-    constexpr Image(T* buf, size_t w, size_t h, size_t s)
+    explicit constexpr Image(T* buf, size_t w, size_t h, size_t s)
         : buffer(buf), width(w), height(h), stride(s)
         {}
 
-    void clear(T color);
+    void clear(T value);
 
     T* buffer;
     size_t width;
@@ -142,9 +142,9 @@ struct Image {
 };
 
 template<typename T>
-void Image<T>::clear(T color) {
+void Image<T>::clear(T value) {
     for (T *p = buffer, *end = buffer + height*stride; p != end; p += stride)
-        std::fill(p, p + width, color);
+        std::fill(p, p + width, value);
 }
 
 enum CullingMode : uint8_t {
