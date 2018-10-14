@@ -70,6 +70,7 @@ namespace bmp {
         }
     };
 
+    template<typename = void>
     std::ostream& writeBitmap(std::ostream& stream, rendirt::Image<rendirt::Color> const& img) {
         FileHeader fhdr;
         CoreHeader chdr;

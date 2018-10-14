@@ -186,9 +186,9 @@ namespace shaders {
     // Takes: direction of the light, ambient color, diffuse color
     // Expects normal vectors to be normalized
     inline Shader diffuseDirectional(glm::vec3 dir, Color ambient, Color diffuse) {
-        dir = glm::normalize(dir);
+        dir = -glm::normalize(dir);
         return [dir,ambient,diffuse](glm::vec3, glm::vec3, glm::vec3 normal) {
-            glm::vec4 color = glm::vec4(ambient) + glm::max(-glm::dot(normal, dir), 0.0f)*glm::vec4(diffuse);
+            glm::vec4 color = glm::vec4(ambient) + glm::max(glm::dot(normal, dir), 0.0f)*glm::vec4(diffuse);
             return Color(glm::clamp(color, 0.0f, 255.0f));
         };
     }

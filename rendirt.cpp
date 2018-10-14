@@ -76,6 +76,8 @@ namespace {
 Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified) {
     std::string tok;
 
+    model.clear();
+
     stream >> std::skipws;
 
     if (!verified) {
@@ -91,8 +93,6 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
     stream >> tok;
     if (!stream)
         return FileTruncated;
-
-    model.clear();
 
     stream >> tok;
     if (stream.fail())
@@ -191,6 +191,9 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
 }
 
 Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNormals, size_t skipped) {
+    // Reassign to free excess memory
+    model = Model();
+
     // Skip header
     stream.ignore(80 - skipped);
 
@@ -200,8 +203,6 @@ Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNo
     if (stream.gcount() < std::streamsize(sizeof(uint32_t)))
         return FileTruncated;
 
-    // Reassign to free memory
-    model = Model();
     model.reserve(size);
     model.resize(size);
 

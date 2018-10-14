@@ -288,6 +288,7 @@ namespace tiff {
         }
     };
 
+    template<typename = void>
     std::ostream& writeTIFF(std::ostream& stream, rendirt::Image<rendirt::Color> const& img) {
         std::uint16_t fieldCount = 14;
         std::uint32_t valueOffset =
