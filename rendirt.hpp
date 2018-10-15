@@ -38,8 +38,8 @@
 namespace rendirt {
 
 struct Face {
+    std::size_t vertex[3];
     glm::vec3 normal;
-    glm::vec3 vertex[3];
 };
 
 struct AABB {
@@ -47,7 +47,24 @@ struct AABB {
     glm::vec3 to;
 };
 
-class Model : public std::vector<Face> {
+struct BVHNode {
+    AABB bbox;
+    bool leaf;
+
+    union {
+        struct {
+            BVHNode* left;
+            BVHNode* right;
+        };
+
+        struct {
+            size_t firstFace;
+            size_t lastFace;
+        };
+    };
+};
+
+class Model {
 public:
     enum Error : uint8_t {
         Ok = 0,
@@ -65,7 +82,9 @@ public:
         Binary
     };
 
-    using std::vector<Face>::vector;
+    Model() = default;
+    Model(Model const&) = default;
+    Model(Model&&) = default;
 
     AABB const& boundingBox() const {
         return boundingBox_;
@@ -75,7 +94,12 @@ public:
         return (boundingBox_.from + boundingBox_.to) / 2.0f;
     }
 
+    std::vector<BVHNode> const& bvh() const {
+        return bvh_;
+    }
+
     void updateBoundingBox();
+    void rebuildBVH(size_t loadFactor = 4);
 
     Error loadSTL(std::istream& stream, Mode mode = Guess) {
         return loadSTL(stream, false, mode);
@@ -84,11 +108,16 @@ public:
     Error loadSTL(std::istream& stream, bool useNormals, Mode mode = Guess);
 
     static char const* errorString(Error err);
+
+    std::vector<glm::vec3> vertices;
+    std::vector<Face> faces;
+
 private:
     AABB boundingBox_;
+    std::vector<BVHNode> bvh_;
 
-    static Error loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified);
-    static Error loadBinarySTL(std::istream& stream, Model& model, bool useNormals, size_t skipped);
+    Error loadTextSTL(std::istream& stream, bool useNormals, bool verified);
+    Error loadBinarySTL(std::istream& stream, bool useNormals, size_t skipped);
 };
 
 struct Projection : glm::mat4 {

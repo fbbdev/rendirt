@@ -45,20 +45,59 @@ using namespace rendirt;
 
 // Model methods
 void Model::updateBoundingBox() {
-    if (empty())
+    if (vertices.empty())
         boundingBox_ = { { 0, 0, 0 }, { 0, 0, 0 } };
     else
-        boundingBox_ = std::accumulate(begin(), end(),
-            AABB{
-                glm::min(front().vertex[0], glm::min(front().vertex[1], front().vertex[2])),
-                glm::max(front().vertex[0], glm::max(front().vertex[1], front().vertex[2]))
-            }, [](AABB const& box, Face const& face) -> AABB {
+        boundingBox_ = std::accumulate(std::next(vertices.begin()), vertices.end(),
+            AABB{ vertices.front(), vertices.front() },
+            [](AABB const& box, glm::vec3 const& vec) -> AABB {
                 return {
-                    glm::min(box.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
-                    glm::max(box.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
+                    glm::min(box.from, vec),
+                    glm::max(box.to, vec)
                 };
             });
 }
+
+namespace {
+    // BVH building helpers
+    void deduplicateVertices(std::vector<glm::vec3> const& vertices,
+                             std::vector<Face>& faces) {
+        if (vertices.size() < 2)
+            return;
+
+        std::vector<size_t> sorted(vertices.size());
+        std::iota(sorted.begin(), sorted.end(), size_t(0));
+
+        std::sort(sorted.begin(), sorted.end(), [&vertices](size_t l, size_t r) {
+            if (vertices[l].x < vertices[r].x) {
+                return true;
+            } else if (vertices[l].x == vertices[r].x) {
+                if (vertices[l].y < vertices[r].y)
+                    return true;
+                else if (vertices[l].y == vertices[r].y)
+                    return vertices[l].z < vertices[r].z;
+            }
+
+            return false;
+        });
+
+        std::vector<size_t> remap(vertices.size());
+        std::iota(remap.begin(), remap.end(), size_t(0));
+
+        for (auto cur = sorted.begin(), it = std::next(sorted.begin()), end = sorted.end(); it != end; ++it) {
+            if (vertices[*it] == vertices[*cur])
+                remap[*it] = *cur;
+            else
+                cur = it;
+        }
+
+        for (auto& face: faces) {
+            face.vertex[0] = remap[face.vertex[0]];
+            face.vertex[1] = remap[face.vertex[1]];
+            face.vertex[2] = remap[face.vertex[2]];
+        }
+    }
+} /* namespace */
 
 namespace {
     // STL format parsing helpers
@@ -72,12 +111,19 @@ namespace {
 
         return count;
     }
+
+    struct STLFace {
+        glm::vec3 normal;
+        glm::vec3 vertex[3];
+    };
 } /* namespace */
 
-Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified) {
+Model::Error Model::loadTextSTL(std::istream& stream, bool useNormals, bool verified) {
     std::string tok;
 
-    model.clear();
+    vertices.clear();
+    faces.clear();
+    bvh_.clear();
 
     stream >> std::skipws;
 
@@ -99,7 +145,7 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
     if (stream.fail())
         return FileTruncated;
 
-    Face face = {};
+    STLFace face = {};
 
     for (bool first = true; tok == "facet";) {
         // Read normal
@@ -162,20 +208,24 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
         if (!useNormals)
             face.normal = glm::triangleNormal(face.vertex[0], face.vertex[1], face.vertex[2]);
 
-        model.push_back(face);
+        vertices.insert(vertices.end(), face.vertex, face.vertex+3);
+        faces.push_back(Face{
+            { vertices.size()-3, vertices.size()-2, vertices.size()-1 },
+            face.normal
+        });
 
         // Update bounding box
         if (first) {
             first = false;
-            model.boundingBox_ = {
+            boundingBox_ = {
                 glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2])),
                 glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2]))
             };
         }
 
-        model.boundingBox_ = {
-            glm::min(model.boundingBox_.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
-            glm::max(model.boundingBox_.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
+        boundingBox_ = {
+            glm::min(boundingBox_.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
+            glm::max(boundingBox_.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
         };
 
         // Read next face or end of model
@@ -187,13 +237,18 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
     if (tok != "endsolid")
         return tok.empty() ? FileTruncated : UnexpectedToken;
 
-    model.shrink_to_fit();
+    vertices.shrink_to_fit();
+    faces.shrink_to_fit();
+    deduplicateVertices(vertices, faces);
+
     return Ok;
 }
 
-Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNormals, size_t skipped) {
+Model::Error Model::loadBinarySTL(std::istream& stream, bool useNormals, size_t skipped) {
     // Reassign to free excess memory
-    model = Model();
+    vertices = std::vector<glm::vec3>();
+    faces = std::vector<Face>();
+    bvh_.clear();
 
     // Skip header
     stream.ignore(80 - skipped);
@@ -204,15 +259,15 @@ Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNo
     if (stream.gcount() < std::streamsize(sizeof(uint32_t)))
         return FileTruncated;
 
-    model.reserve(size);
-    model.resize(size);
+    vertices.reserve(3*size);
+    faces.reserve(size);
 
-    auto begin = model.begin(), end = model.end();
+    STLFace face = {};
     uint16_t attrs = 0;
 
-    for (auto face = begin; face != end; ++face) {
-        stream.read(reinterpret_cast<char*>(&*face), sizeof(Face));
-        if (stream.gcount() < std::streamsize(sizeof(Face)))
+    for (uint32_t i = 0; i < size; ++i) {
+        stream.read(reinterpret_cast<char*>(&face), sizeof(STLFace));
+        if (stream.gcount() < std::streamsize(sizeof(STLFace)))
             return FileTruncated;
 
         // Ignore attrs: they should be zero, some programs use them
@@ -223,20 +278,28 @@ Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNo
 
         // Recompute normal (some programs are known to write garbage)
         if (!useNormals)
-            face->normal = glm::triangleNormal(face->vertex[0], face->vertex[1], face->vertex[2]);
+            face.normal = glm::triangleNormal(face.vertex[0], face.vertex[1], face.vertex[2]);
+
+        vertices.insert(vertices.end(), face.vertex, face.vertex+3);
+        faces.push_back(Face{
+            { vertices.size()-3, vertices.size()-2, vertices.size()-1 },
+            face.normal
+        });
 
         // Update bounding box
-        if (face == begin)
-            model.boundingBox_ = {
-                glm::min(face->vertex[0], glm::min(face->vertex[1], face->vertex[2])),
-                glm::max(face->vertex[0], glm::max(face->vertex[1], face->vertex[2]))
+        if (i == 0)
+            boundingBox_ = {
+                glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2])),
+                glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2]))
             };
 
-        model.boundingBox_ = {
-            glm::min(model.boundingBox_.from, glm::min(face->vertex[0], glm::min(face->vertex[1], face->vertex[2]))),
-            glm::max(model.boundingBox_.to,   glm::max(face->vertex[0], glm::max(face->vertex[1], face->vertex[2])))
+        boundingBox_ = {
+            glm::min(boundingBox_.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
+            glm::max(boundingBox_.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
         };
     }
+
+    deduplicateVertices(vertices, faces);
 
     return Ok;
 }
@@ -266,8 +329,8 @@ Model::Error Model::loadSTL(std::istream& stream, bool useNormals, Mode mode) {
             mode = Binary;
     }
 
-    return (mode == Text) ? loadTextSTL(stream, *this, useNormals, skipped > 0)
-                          : loadBinarySTL(stream, *this, useNormals, skipped);
+    return (mode == Text) ? loadTextSTL(stream, useNormals, skipped > 0)
+                          : loadBinarySTL(stream, useNormals, skipped);
 }
 
 char const* Model::errorString(Error err) {
@@ -297,11 +360,11 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
 
     glm::vec2 sampleStep = glm::vec2(2.0f, -2.0f)/imgSizef;
 
-    for (auto const& face: model) {
+    for (auto const& face: model.faces) {
         glm::vec4 clipf[3] = {
-            modelViewProj * glm::vec4(face.vertex[0], 1.0f),
-            modelViewProj * glm::vec4(face.vertex[1], 1.0f),
-            modelViewProj * glm::vec4(face.vertex[2], 1.0f)
+            modelViewProj * glm::vec4(model.vertices[face.vertex[0]], 1.0f),
+            modelViewProj * glm::vec4(model.vertices[face.vertex[1]], 1.0f),
+            modelViewProj * glm::vec4(model.vertices[face.vertex[2]], 1.0f)
         };
 
         clipf[0] /= clipf[0].w; clipf[1] /= clipf[1].w; clipf[2] /= clipf[2].w;
@@ -340,9 +403,9 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
         } / doubleArea;
 
         const glm::vec3 posParams[3] = {
-            face.vertex[0],
-            face.vertex[1] - face.vertex[0],
-            face.vertex[2] - face.vertex[0]
+            model.vertices[face.vertex[0]],
+            model.vertices[face.vertex[1]] - model.vertices[face.vertex[0]],
+            model.vertices[face.vertex[2]] - model.vertices[face.vertex[0]]
         };
         const glm::vec3 zParams(clipf[0].z, clipf[1].z - clipf[0].z, clipf[2].z - clipf[0].z);
 

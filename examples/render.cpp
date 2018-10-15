@@ -76,10 +76,11 @@ int main(int argc, char* argv[]) {
 
     std::cerr << "Model loaded in "
               << std::chrono::duration_cast<frac_ms>(end - start).count() << " ms\n"
-              << "Face count: " << model.size() << '\n'
+              << "Vertex count: " << model.vertices.size() << '\n'
+              << "Face count: " << model.faces.size() << '\n'
               << "Bounding box: { " << model.boundingBox().from << ", " << model.boundingBox().to << " }\n"
               << "Center: " << model.center() << '\n'
-              << "Memory usage: " << double(model.capacity()*sizeof(rd::Face))/1024.0 << " KB"
+              << "Memory usage: " << double(model.vertices.capacity()*sizeof(glm::vec3) + model.faces.capacity()*sizeof(rd::Face))/1024.0 << " KB"
               << std::endl;
 
     // Create 800x600 px image and depth buffer
