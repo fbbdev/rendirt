@@ -74,10 +74,10 @@ namespace {
     }
 } /* namespace */
 
-Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified) {
+Model::Error Model::loadTextSTL(std::istream& stream, bool useNormals, bool verified) {
     std::string tok;
 
-    model.clear();
+    clear();
 
     stream >> std::skipws;
 
@@ -162,20 +162,20 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
         if (!useNormals)
             face.normal = glm::triangleNormal(face.vertex[0], face.vertex[1], face.vertex[2]);
 
-        model.push_back(face);
+        push_back(face);
 
         // Update bounding box
         if (first) {
             first = false;
-            model.boundingBox_ = {
+            boundingBox_ = {
                 glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2])),
                 glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2]))
             };
         }
 
-        model.boundingBox_ = {
-            glm::min(model.boundingBox_.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
-            glm::max(model.boundingBox_.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
+        boundingBox_ = {
+            glm::min(boundingBox_.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
+            glm::max(boundingBox_.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
         };
 
         // Read next face or end of model
@@ -187,13 +187,13 @@ Model::Error Model::loadTextSTL(std::istream& stream, Model& model, bool useNorm
     if (tok != "endsolid")
         return tok.empty() ? FileTruncated : UnexpectedToken;
 
-    model.shrink_to_fit();
+    shrink_to_fit();
     return Ok;
 }
 
-Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNormals, size_t skipped) {
+Model::Error Model::loadBinarySTL(std::istream& stream, bool useNormals, size_t skipped) {
     // Reassign to free excess memory
-    model = Model();
+    *this = Model();
 
     // Skip header
     stream.ignore(80 - skipped);
@@ -204,13 +204,13 @@ Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNo
     if (stream.gcount() < std::streamsize(sizeof(uint32_t)))
         return FileTruncated;
 
-    model.reserve(size);
-    model.resize(size);
+    reserve(size);
+    resize(size);
 
-    auto begin = model.begin(), end = model.end();
+    auto first = begin(), last = end();
     uint16_t attrs = 0;
 
-    for (auto face = begin; face != end; ++face) {
+    for (auto face = first; face != last; ++face) {
         stream.read(reinterpret_cast<char*>(&*face), sizeof(Face));
         if (stream.gcount() < std::streamsize(sizeof(Face)))
             return FileTruncated;
@@ -226,15 +226,15 @@ Model::Error Model::loadBinarySTL(std::istream& stream, Model& model, bool useNo
             face->normal = glm::triangleNormal(face->vertex[0], face->vertex[1], face->vertex[2]);
 
         // Update bounding box
-        if (face == begin)
-            model.boundingBox_ = {
+        if (face == first)
+            boundingBox_ = {
                 glm::min(face->vertex[0], glm::min(face->vertex[1], face->vertex[2])),
                 glm::max(face->vertex[0], glm::max(face->vertex[1], face->vertex[2]))
             };
 
-        model.boundingBox_ = {
-            glm::min(model.boundingBox_.from, glm::min(face->vertex[0], glm::min(face->vertex[1], face->vertex[2]))),
-            glm::max(model.boundingBox_.to,   glm::max(face->vertex[0], glm::max(face->vertex[1], face->vertex[2])))
+        boundingBox_ = {
+            glm::min(boundingBox_.from, glm::min(face->vertex[0], glm::min(face->vertex[1], face->vertex[2]))),
+            glm::max(boundingBox_.to,   glm::max(face->vertex[0], glm::max(face->vertex[1], face->vertex[2])))
         };
     }
 
@@ -266,8 +266,8 @@ Model::Error Model::loadSTL(std::istream& stream, bool useNormals, Mode mode) {
             mode = Binary;
     }
 
-    return (mode == Text) ? loadTextSTL(stream, *this, useNormals, skipped > 0)
-                          : loadBinarySTL(stream, *this, useNormals, skipped);
+    return (mode == Text) ? loadTextSTL(stream, useNormals, skipped > 0)
+                          : loadBinarySTL(stream, useNormals, skipped);
 }
 
 char const* Model::errorString(Error err) {

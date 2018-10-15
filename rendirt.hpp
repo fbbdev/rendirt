@@ -87,8 +87,8 @@ public:
 private:
     AABB boundingBox_;
 
-    static Error loadTextSTL(std::istream& stream, Model& model, bool useNormals, bool verified);
-    static Error loadBinarySTL(std::istream& stream, Model& model, bool useNormals, size_t skipped);
+    Error loadTextSTL(std::istream& stream, bool useNormals, bool verified);
+    Error loadBinarySTL(std::istream& stream, bool useNormals, size_t skipped);
 };
 
 struct Projection : glm::mat4 {
