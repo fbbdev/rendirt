@@ -75,7 +75,7 @@ Interesting test models can be downloaded
 [here](http://people.sc.fsu.edu/~jburkardt/data/stla/stla.html). They're not
 included in this repository because of size and licensing.
 
-# Show me the code!
+# Show me the code
 
 Here it comes! This is the bare minimum to obtain an image. For more details
 and variations look into the [examples](examples) folder.
@@ -100,6 +100,9 @@ std::vector<rd::Color> colorBuffer(800*600);
 std::vector<float> depthBuffer(800*600);
 Image<rd::Color> image(colorBuffer.data(), 800, 600);
 Image<float> depth(depthBuffer.data(), 800, 600);
+
+image.clear(Color(0, 0, 0, 255));
+depth.clear(1.0f); // Important!
 
 rd::Camera view(
     { 0.0f, 0.0f, 5.0f },
@@ -180,7 +183,7 @@ size_t render(Image<Color> const& color, Image<float> const& depth,
   - `depth`: a valid buffer of type [`Image<float>`](#struct-rendirtimaget)
     that will be used for depth testing. This buffer *must* have the same width
     and height as the `color` one: debug builds use `assert` to ensure this
-    condition holds; relese builds just assume this is the case. When doing a
+    condition holds; release builds just assume this is the case. When doing a
     clean render, this buffer must be reset to a value of `1.0f` (e.g. by
     calling `depth.clear(1.0f)`).
   - `model`: a [`Model`](#class-rendirtmodel) instance containing mesh data to
