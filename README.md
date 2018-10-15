@@ -482,7 +482,7 @@ struct AABB {
 ## `using rendirt::Color`
 
 The `Color` type is an alias for a *glm* vector of four bytes, capable of
-representing a color in RGBA32 format.
+representing a color in RGBA32 (byte order) pixel format.
 
 ```c++
 using Color = glm::vec<4, uint8_t>;
