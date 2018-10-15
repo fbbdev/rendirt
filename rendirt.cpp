@@ -38,6 +38,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <limits>
 #include <numeric>
 
@@ -60,7 +61,7 @@ void Model::updateBoundingBox() {
 
 namespace {
     // BVH building helpers
-    void deduplicateVertices(std::vector<glm::vec3> const& vertices,
+    void deduplicateVertices(std::vector<glm::vec3>& vertices,
                              std::vector<Face>& faces) {
         if (vertices.size() < 2)
             return;
@@ -68,7 +69,8 @@ namespace {
         std::vector<size_t> sorted(vertices.size());
         std::iota(sorted.begin(), sorted.end(), size_t(0));
 
-        std::sort(sorted.begin(), sorted.end(), [&vertices](size_t l, size_t r) {
+        // Sort by component value
+        std::stable_sort(sorted.begin(), sorted.end(), [&vertices](size_t l, size_t r) {
             if (vertices[l].x < vertices[r].x) {
                 return true;
             } else if (vertices[l].x == vertices[r].x) {
@@ -84,6 +86,7 @@ namespace {
         std::vector<size_t> remap(vertices.size());
         std::iota(remap.begin(), remap.end(), size_t(0));
 
+        // Deduplicate and build reverse mapping
         for (auto cur = sorted.begin(), it = std::next(sorted.begin()), end = sorted.end(); it != end; ++it) {
             if (vertices[*it] == vertices[*cur])
                 remap[*it] = *cur;
@@ -91,6 +94,23 @@ namespace {
                 cur = it;
         }
 
+        // Relocate vertices
+        size_t cur = 0;
+        for (size_t pos = 1; pos < remap.size(); ++pos) {
+            if (remap[pos] == pos) {
+                if (++cur != pos) {
+                    remap[pos] = cur;
+                    vertices[cur] = vertices[pos];
+                }
+            } else {
+                remap[pos] = remap[remap[pos]];
+            }
+        }
+
+        vertices.erase(vertices.begin() + cur + 1, vertices.end());
+        vertices.shrink_to_fit();
+
+        // Update vertex indices
         for (auto& face: faces) {
             face.vertex[0] = remap[face.vertex[0]];
             face.vertex[1] = remap[face.vertex[1]];
