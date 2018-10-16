@@ -38,7 +38,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <iostream>
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -146,30 +145,40 @@ void Model::rebuildBVH(size_t targetLoad) {
     });
 
     bvh_.reserve(2*objects.size() + 1);
-    buildBVHSide(bvh_, boundingBox(), objects.begin(), objects.begin(), objects.end(), glm::max(targetLoad, size_t(1)));
+    buildBVHSide(bvh_, boundingBox(), objects.begin(), objects.begin(), objects.end(), targetLoad + 1);
 
-    std::cerr << "BVH: built bvh with " << bvh_.size() << " nodes. Sorting faces: 0%" << std::flush;
+    std::vector<Face> sortedFaces;
 
-    for (size_t i = 0; i < objects.size(); ++i) {
-        assert(objects[i].face >= i);
+    sortedFaces.reserve(objects.size());
+    std::transform(objects.begin(), objects.end(), std::back_inserter(sortedFaces), [this](BVHObject const& obj) {
+        return faces[obj.face];
+    });
 
-        if (i % (objects.size()/100) == 0)
-            std::cerr << "\rBVH: built bvh with " << bvh_.size() << " nodes. Sorting faces: " << i*100/objects.size() << "%" << std::flush;
+    faces.swap(sortedFaces);
+    sortedFaces.clear();
+    sortedFaces.shrink_to_fit();
 
-        if (objects[i].face > i) {
-            std::swap(faces[i], faces[objects[i].face]);
-            for (size_t j = i+1; j < objects.size(); ++j) {
-                if (objects[j].face == i) {
-                    objects[j].face = objects[i].face;
-                    break;
-                }
+    static constexpr size_t unmapped = std::numeric_limits<size_t>::max();
+
+    std::vector<size_t> remap(vertices.size(), unmapped);
+    std::vector<glm::vec3> sortedVertices;
+
+    sortedVertices.reserve(vertices.size());
+
+    for (auto& face: faces) {
+        for (auto& vertex: face.vertex) {
+            if (remap[vertex] == unmapped) {
+                remap[vertex] = sortedVertices.size();
+                sortedVertices.push_back(vertices[vertex]);
             }
+
+            vertex = remap[vertex];
         }
     }
 
-    std::cerr << "\rBVH: built bvh with " << bvh_.size() << " nodes. Sorting faces: 100%" << std::endl;
-
-    // FIXME: sort vertices
+    vertices.swap(sortedVertices);
+    sortedVertices.clear();
+    sortedVertices.shrink_to_fit();
 
     bvh_.shrink_to_fit();
 }
