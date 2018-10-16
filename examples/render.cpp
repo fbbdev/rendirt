@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
 
     for (size_t i = 0, end = img.height*img.stride; i < end; i += img.stride - img.width)
         for (size_t rend = i + img.width; i < rend; ++i)
-            img.buffer[i] = rd::Color(RGB48(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
+            img.buffer[i] = rd::Color(RGB48(img.buffer[i]) * std::uint16_t(img.buffer[i].a) / std::uint16_t(255), img.buffer[i].a);
 
     if (!tiff::writeTIFF(output, img)) {
         std::cerr << "./render.tiff: write failed: " << strerror(errno) << std::endl;
