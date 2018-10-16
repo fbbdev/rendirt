@@ -63,6 +63,10 @@ namespace {
         glm::vec3 centroid;
     };
 
+    AABB accumulateBbox(AABB const& bbox, BVHObject const& obj) {
+        return AABB{ glm::min(bbox.from, obj.bbox.from), glm::max(bbox.to, obj.bbox.to) };
+    }
+
     template<typename Iterator>
     void buildBVHSide(std::vector<BVHNode>& bvh, AABB bbox,
                       Iterator base, Iterator first, Iterator last,
@@ -93,7 +97,7 @@ namespace {
         Iterator median = first + (last - first)/2;
         AABB medianBbox = {};
 
-        Iterator split = first;
+        Iterator split = std::next(first);
         for (; split != last; ++split) {
             childBbox.from = glm::min(childBbox.from, split->bbox.from);
             childBbox.to = glm::max(childBbox.to, split->bbox.to);
@@ -115,10 +119,7 @@ namespace {
         bvh[index].leftOrFirstFace = bvh.size();
         buildBVHSide(bvh, childBbox, base, first, split, targetLoad);
 
-        childBbox = std::accumulate(std::next(split), last, split->bbox,
-            [](AABB const& bbox, BVHObject const& obj) -> AABB {
-                return AABB{ glm::min(bbox.from, obj.bbox.from), glm::max(bbox.to, obj.bbox.to) };
-            });
+        childBbox = std::accumulate(std::next(split), last, split->bbox, accumulateBbox);
 
         bvh[index].rightOrLastFace = bvh.size();
         return buildBVHSide(bvh, childBbox, base, split, last, targetLoad);
