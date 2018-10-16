@@ -54,8 +54,8 @@ void Model::updateBoundingBox() {
                 glm::max(front().vertex[0], glm::max(front().vertex[1], front().vertex[2]))
             }, [](AABB const& box, Face const& face) -> AABB {
                 return {
-                    glm::min(box.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
-                    glm::max(box.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
+                    glm::min(glm::min(box.from, face.vertex[0]), glm::min(face.vertex[1], face.vertex[2])),
+                    glm::max(glm::max(box.to, face.vertex[0]), glm::max(face.vertex[1], face.vertex[2]))
                 };
             });
 }
@@ -174,8 +174,8 @@ Model::Error Model::loadTextSTL(std::istream& stream, bool useNormals, bool veri
         }
 
         boundingBox_ = {
-            glm::min(boundingBox_.from, glm::min(face.vertex[0], glm::min(face.vertex[1], face.vertex[2]))),
-            glm::max(boundingBox_.to,   glm::max(face.vertex[0], glm::max(face.vertex[1], face.vertex[2])))
+            glm::min(glm::min(boundingBox_.from, face.vertex[0]), glm::min(face.vertex[1], face.vertex[2])),
+            glm::max(glm::max(boundingBox_.to, face.vertex[0]), glm::max(face.vertex[1], face.vertex[2]))
         };
 
         // Read next face or end of model
@@ -233,8 +233,8 @@ Model::Error Model::loadBinarySTL(std::istream& stream, bool useNormals, size_t 
             };
 
         boundingBox_ = {
-            glm::min(boundingBox_.from, glm::min(face->vertex[0], glm::min(face->vertex[1], face->vertex[2]))),
-            glm::max(boundingBox_.to,   glm::max(face->vertex[0], glm::max(face->vertex[1], face->vertex[2])))
+            glm::min(glm::min(boundingBox_.from, face->vertex[0]), glm::min(face->vertex[1], face->vertex[2])),
+            glm::max(glm::max(boundingBox_.to, face->vertex[0]), glm::max(face->vertex[1], face->vertex[2]))
         };
     }
 
