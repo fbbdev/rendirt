@@ -51,17 +51,28 @@ struct BVHNode {
     AABB bbox;
     bool leaf;
 
-    union {
-        struct {
-            BVHNode* left;
-            BVHNode* right;
-        };
+    size_t leftOrFirstFace;
+    size_t rightOrLastFace;
 
-        struct {
-            size_t firstFace;
-            size_t lastFace;
-        };
-    };
+    constexpr size_t left() const {
+        return leaf ? 0 : leftOrFirstFace;
+    }
+
+    constexpr size_t right() const {
+        return leaf ? 0 : rightOrLastFace;
+    }
+
+    constexpr size_t firstFace() const {
+        return leaf ? leftOrFirstFace : 0;
+    }
+
+    constexpr size_t lastFace() const {
+        return leaf ? rightOrLastFace : 0;
+    }
+
+    constexpr size_t load() const {
+        return lastFace() - firstFace();
+    }
 };
 
 class Model {
@@ -99,7 +110,7 @@ public:
     }
 
     void updateBoundingBox();
-    void rebuildBVH(size_t loadFactor = 4);
+    void rebuildBVH(size_t targetLoad = 4);
 
     Error loadSTL(std::istream& stream, Mode mode = Guess) {
         return loadSTL(stream, false, mode);

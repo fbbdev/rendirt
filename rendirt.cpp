@@ -41,6 +41,7 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <type_traits>
 
 using namespace rendirt;
 
@@ -52,15 +53,129 @@ void Model::updateBoundingBox() {
         boundingBox_ = std::accumulate(std::next(vertices.begin()), vertices.end(),
             AABB{ vertices.front(), vertices.front() },
             [](AABB const& box, glm::vec3 const& vec) -> AABB {
-                return {
-                    glm::min(box.from, vec),
-                    glm::max(box.to, vec)
-                };
+                return { glm::min(box.from, vec), glm::max(box.to, vec) };
             });
 }
 
 namespace {
-    // BVH building helpers
+    struct BVHObject {
+        size_t face;
+        AABB bbox;
+        glm::vec3 centroid;
+    };
+
+    template<typename Iterator>
+    void buildBVHSide(std::vector<BVHNode>& bvh, AABB bbox,
+                      Iterator base, Iterator first, Iterator last,
+                      size_t targetLoad)
+    {
+        size_t index = bvh.size();
+        bvh.push_back(BVHNode{
+            bbox, true,
+            size_t(first - base),
+            size_t(last - base)
+        });
+
+        if (last - first <= typename std::make_signed<size_t>::type(targetLoad))
+            return;
+
+        // Sort objects by centroid position along the largest dimension
+        // of the bounding box
+        glm::vec3 diag = glm::abs(bbox.to - bbox.from);
+        std::uint8_t dir = (diag.y > diag.x) ? ((diag.z > diag.y) ? 2 : 1)
+                                             : ((diag.z > diag.x) ? 2 : 0);
+        std::sort(first, last, [dir](BVHObject const& l, BVHObject const& r) {
+            return l.centroid[dir] < r.centroid[dir];
+        });
+
+        glm::vec3 centroid = (bbox.from + bbox.to) / 2.0f;
+        AABB childBbox = first->bbox;
+
+        Iterator median = first + (last - first)/2;
+        AABB medianBbox = {};
+
+        Iterator split = first;
+        for (; split != last; ++split) {
+            childBbox.from = glm::min(childBbox.from, split->bbox.from);
+            childBbox.to = glm::max(childBbox.to, split->bbox.to);
+
+            if (split == median)
+                medianBbox = childBbox;
+
+            if (split->centroid[dir] > centroid[dir])
+                break;
+        }
+
+        // If empty, revert to median splitting
+        if (split == last) {
+            split = median;
+            childBbox = medianBbox;
+        }
+
+        bvh[index].leaf = false;
+        bvh[index].leftOrFirstFace = bvh.size();
+        buildBVHSide(bvh, childBbox, base, first, split, targetLoad);
+
+        childBbox = std::accumulate(std::next(split), last, split->bbox,
+            [](AABB const& bbox, BVHObject const& obj) -> AABB {
+                return AABB{ glm::min(bbox.from, obj.bbox.from), glm::max(bbox.to, obj.bbox.to) };
+            });
+
+        bvh[index].rightOrLastFace = bvh.size();
+        return buildBVHSide(bvh, childBbox, base, split, last, targetLoad);
+    }
+} /* namespace */
+
+void Model::rebuildBVH(size_t targetLoad) {
+    bvh_.clear();
+
+    if (faces.empty() || vertices.empty())
+        return;
+
+    std::vector<BVHObject> objects;
+    objects.reserve(faces.size());
+
+    size_t index = 0;
+    std::transform(faces.begin(), faces.end(), std::back_inserter(objects), [this,&index](Face const& face) {
+        AABB bbox = {
+            glm::min(vertices[face.vertex[0]], glm::min(vertices[face.vertex[1]], vertices[face.vertex[2]])),
+            glm::max(vertices[face.vertex[0]], glm::max(vertices[face.vertex[1]], vertices[face.vertex[2]]))
+        };
+
+        return BVHObject{index++, bbox, (bbox.from + bbox.to) / 2.0f};
+    });
+
+    bvh_.reserve(2*objects.size() + 1);
+    buildBVHSide(bvh_, boundingBox(), objects.begin(), objects.begin(), objects.end(), glm::max(targetLoad, size_t(1)));
+
+    std::cerr << "BVH: built bvh with " << bvh_.size() << " nodes. Sorting faces: 0%" << std::flush;
+
+    for (size_t i = 0; i < objects.size(); ++i) {
+        assert(objects[i].face >= i);
+
+        if (i % (objects.size()/100) == 0)
+            std::cerr << "\rBVH: built bvh with " << bvh_.size() << " nodes. Sorting faces: " << i*100/objects.size() << "%" << std::flush;
+
+        if (objects[i].face > i) {
+            std::swap(faces[i], faces[objects[i].face]);
+            for (size_t j = i+1; j < objects.size(); ++j) {
+                if (objects[j].face == i) {
+                    objects[j].face = objects[i].face;
+                    break;
+                }
+            }
+        }
+    }
+
+    std::cerr << "\rBVH: built bvh with " << bvh_.size() << " nodes. Sorting faces: 100%" << std::endl;
+
+    // FIXME: sort vertices
+
+    bvh_.shrink_to_fit();
+}
+
+namespace {
+    // Model loading helpers
     void deduplicateVertices(std::vector<glm::vec3>& vertices,
                              std::vector<Face>& faces) {
         if (vertices.size() < 2)
@@ -117,9 +232,7 @@ namespace {
             face.vertex[2] = remap[face.vertex[2]];
         }
     }
-} /* namespace */
 
-namespace {
     // STL format parsing helpers
     size_t skipWhitespace(std::istream& stream, size_t limit = -1) {
         size_t count = 0;
