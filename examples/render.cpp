@@ -83,16 +83,16 @@ int main(int argc, char* argv[]) {
               << std::endl;
 
     // Create 800x600 px image and depth buffer
-    std::vector<rd::Color> colorBuffer(800*600);
-    rd::Image<rd::Color> img(colorBuffer.data(), 800, 600);
-    img.clear(rd::Color(0, 0, 0, 255));
+    std::vector<rd::Color> colorBuffer(4*800*600);
+    rd::Image<rd::Color> color(colorBuffer.data(), 2*800, 2*600);
+    color.clear(rd::Color(0, 0, 0, 255));
 
-    std::vector<float> depthBuffer(800*600);
-    rd::Image<float> depth(depthBuffer.data(), 800, 600);
+    std::vector<float> depthBuffer(4*800*600);
+    rd::Image<float> depth(depthBuffer.data(), 2*800, 2*600);
     depth.clear(1.0f); // Depth buffer must be cleared to 1.0f
 
     // Precalculate useful values
-    float aspect = float(img.width) / float(img.height);
+    float aspect = float(color.width) / float(color.height);
     glm::vec3 diagonal = glm::abs(model.boundingBox().to - model.boundingBox().from);
     float maxDim = glm::max(diagonal.x, glm::max(diagonal.y, diagonal.z));
 
@@ -118,12 +118,12 @@ int main(int argc, char* argv[]) {
     // Build perspective projection with 60deg fov
     rd::Projection proj(
         rd::Projection::Perspective,
-        60.0f/180.0f*glm::pi<float>(), img.width, img.height,
+        60.0f/180.0f*glm::pi<float>(), color.width, color.height,
         0.1f, 2.0f*glm::length(diagonal));
 
     start = std::chrono::high_resolution_clock::now();
 
-    size_t count = rd::render(img, depth, model, proj*view,
+    size_t count = rd::render(color, depth, model, proj*view,
         // rd::shaders::depth);
         // rd::shaders::position(model.boundingBox()));
         // rd::shaders::normal);
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
 
     std::cerr << "Rendering completed in "
               << std::chrono::duration_cast<frac_ms>(end - start).count() << " ms\n"
-              << "Resolution: " << img.width << "x" << img.height << " px\n"
+              << "Resolution (2x): " << color.width << "x" << color.height << " px\n"
               << "Rasterized faces: " << count
               << std::endl;
 
@@ -144,12 +144,20 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // Convert image to premultiplied alpha
+    // Downsample image and convert to premultiplied alpha
     using RGB48 = glm::vec<3, std::uint16_t>;
+    rd::Image<rd::Color> img(color.buffer, color.width/2, color.height/2, color.stride);
 
-    for (size_t i = 0, end = img.height*img.stride; i < end; i += img.stride - img.width)
-        for (size_t rend = i + img.width; i < rend; ++i)
-            img.buffer[i] = rd::Color(RGB48(img.buffer[i]) / std::uint16_t(256-img.buffer[i].a), img.buffer[i].a);
+    for (size_t y = 0; y < color.height/2; ++y) {
+        for (size_t x = 0; x < color.width/2; ++x) {
+            rd::Color c = color.buffer[2*y*color.stride + 2*x]/uint8_t(4) +
+                          color.buffer[2*y*color.stride + 2*x + 1]/uint8_t(4) +
+                          color.buffer[(2*y + 1)*color.stride + 2*x]/uint8_t(4) +
+                          color.buffer[(2*y + 1)*color.stride + 2*x + 1]/uint8_t(4);
+
+            img.buffer[y*img.stride + x] = rd::Color(RGB48(c) * std::uint16_t(c.a) / std::uint16_t(255), c.a);
+        }
+    }
 
     if (!tiff::writeTIFF(output, img)) {
         std::cerr << "./render.tiff: write failed: " << strerror(errno) << std::endl;

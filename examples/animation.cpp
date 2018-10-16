@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
     // Build perspective projection with 60deg fov
     rd::Projection perspective(
         rd::Projection::Perspective,
-        60.0f/180.0f*glm::pi<float>(), width, height,
+        60.0f/180.0f*glm::pi<float>(), 2*width, 2*height,
         0.1f, 2.0f*glm::length(diagonal));
 
     rd::Projection* proj = &perspective;
@@ -128,9 +128,11 @@ int main(int argc, char* argv[]) {
     rd::CullingMode cullingModes[] = { rd::CullNone, rd::CullCW, rd::CullCCW };
     rd::CullingMode* currentCullingMode = &cullingModes[1];
 
-    std::vector<float> depthBuffer(width*height);
-    rd::Image<float> depth(depthBuffer.data(), width, height);
-    depth.clear(1.0f);
+    std::vector<rd::Color> colorBuffer(4*width*height);
+    std::vector<float> depthBuffer(4*width*height);
+
+    rd::Image<rd::Color> color(colorBuffer.data(), 2*width, 2*height);
+    rd::Image<float> depth(depthBuffer.data(), 2*width, 2*height);
 
     std::cerr << "Starting renderer.\n"
               << "Current shader: " << shaderNames[currentShader-shaders] << ". Press SPACE to change.\n"
@@ -164,8 +166,10 @@ int main(int argc, char* argv[]) {
                         aspect = float(width) / float(height);
 
                         // Aspect changed, rebuild depth buffer and projection matrices
-                        depthBuffer.resize(width*height);
-                        depth = rd::Image<float>(depthBuffer.data(), width, height);
+                        colorBuffer.resize(4*width*height);
+                        depthBuffer.resize(4*width*height);
+                        color = rd::Image<rd::Color>(colorBuffer.data(), 2*width, 2*height);
+                        depth = rd::Image<float>(depthBuffer.data(), 2*width, 2*height);
 
                         ortho = rd::Projection(
                             rd::Projection::Orthographic,
@@ -175,7 +179,7 @@ int main(int argc, char* argv[]) {
 
                         perspective = rd::Projection(
                             rd::Projection::Perspective,
-                            60.0f/180.0f*glm::pi<float>(), width, height,
+                            60.0f/180.0f*glm::pi<float>(), 2*width, 2*height,
                             0.1f, 2.0f*glm::length(diagonal));
                     }
                 } else if (ev.type == SDL_WINDOWEVENT &&
@@ -226,13 +230,15 @@ int main(int argc, char* argv[]) {
 
         lastFrame = ticks;
 
-        void* pixels = NULL;
+        rd::Color* pixels = NULL;
         int pitch = 0;
-        if (!SDL_LockTexture(texture, NULL, &pixels, &pitch)) {
+        if (!SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch)) {
             if (pitch % sizeof(rd::Color)) {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Texture pitch is not a multiple of pixel size: %d", pitch);
                 return -1;
             }
+
+            pitch /= sizeof(rd::Color);
 
             // Animate camera
             eye += step;
@@ -253,12 +259,21 @@ int main(int argc, char* argv[]) {
                 model.center(),
                 { 0.0f, 1.0f, 0.0f });
 
-            rd::Image<rd::Color> img(reinterpret_cast<rd::Color*>(pixels), width, height, pitch/sizeof(rd::Color));
-            img.clear(rd::Color(0, 0, 0, 255));
+            color.clear(rd::Color(0, 0, 0, 255));
             depth.clear(1.0f);
 
-            trisPerFrame += (rd::render(img, depth, model, *proj * view, *currentShader, *currentCullingMode)
+            trisPerFrame += (rd::render(color, depth, model, *proj * view, *currentShader, *currentCullingMode)
                 - trisPerFrame) / (frames+1) ;
+
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    pixels[y*pitch + x] =
+                        color.buffer[2*y*color.stride + 2*x]/uint8_t(4) +
+                        color.buffer[2*y*color.stride + 2*x + 1]/uint8_t(4) +
+                        color.buffer[(2*y + 1)*color.stride + 2*x]/uint8_t(4) +
+                        color.buffer[(2*y + 1)*color.stride + 2*x + 1]/uint8_t(4);
+                }
+            }
 
             SDL_UnlockTexture(texture);
         } else {
