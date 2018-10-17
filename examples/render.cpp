@@ -37,47 +37,6 @@ std::ostream& operator<<(std::ostream& stream, glm::vec3 const& v) {
     return stream << "vec3{" << v.x << ", " << v.y << ", " << v.z << "}";
 }
 
-void writeTriangle(std::ostream& stream, glm::vec3 const& p1, glm::vec3 const& p2, glm::vec3 const& p3) {
-    glm::vec3 normal = glm::cross(p2 - p1, p3 - p1);
-    stream.write(reinterpret_cast<char const*>(&normal), sizeof(normal));
-    stream.write(reinterpret_cast<char const*>(&p1), sizeof(p1));
-    stream.write(reinterpret_cast<char const*>(&p2), sizeof(p2));
-    stream.write(reinterpret_cast<char const*>(&p3), sizeof(p3));
-
-    std::uint16_t attr = 0;
-    stream.write(reinterpret_cast<char const*>(&attr), sizeof(attr));
-}
-
-void exportBVH(std::string const& name, std::vector<rd::BVHNode> const& bvh) {
-    std::ofstream file(name, std::ofstream::binary);
-
-    file.write("bvh                                                                             ", 80);
-
-    std::uint32_t count = std::uint32_t(bvh.size()) * 12;
-    file.write(reinterpret_cast<char const*>(&count), sizeof(count));
-
-    for (auto const& node: bvh) {
-        glm::vec3 p1 = node.bbox.from, p2 = node.bbox.to;
-        writeTriangle(file, { p2.x, p2.y, p1.z }, { p2.x, p1.y, p1.z }, p1);
-        writeTriangle(file, p1, { p1.x, p2.y, p1.z }, { p2.x, p2.y, p1.z });
-
-        writeTriangle(file, p2, { p2.x, p1.y, p2.z }, { p2.x, p1.y, p1.z });
-        writeTriangle(file, { p2.x, p1.y, p1.z }, { p2.x, p2.y, p1.z }, p2);
-
-        writeTriangle(file, { p1.x, p2.y, p2.z }, { p1.x, p1.y, p2.z }, { p2.x, p1.y, p2.z });
-        writeTriangle(file, { p2.x, p1.y, p2.z }, p2, { p1.x, p2.y, p2.z });
-
-        writeTriangle(file, { p1.x, p2.y, p1.z }, p1, { p1.x, p1.y, p2.z });
-        writeTriangle(file, { p1.x, p1.y, p2.z }, { p1.x, p2.y, p2.z }, { p1.x, p2.y, p1.z });
-
-        writeTriangle(file, { p2.x, p1.y, p2.z }, { p1.x, p1.y, p2.z }, p1);
-        writeTriangle(file, p1, { p2.x, p1.y, p1.z }, { p2.x, p1.y, p2.z });
-
-        writeTriangle(file, { p1.x, p2.y, p1.z }, { p1.x, p2.y, p2.z }, p2);
-        writeTriangle(file, p2, { p2.x, p2.y, p1.z }, { p1.x, p2.y, p1.z });
-    }
-}
-
 int main(int argc, char* argv[]) {
     // Loads a STL file and saves the rendered image to render.tiff
     // if no argument is given on the command line, reads model data from stdin
@@ -126,8 +85,6 @@ int main(int argc, char* argv[]) {
               << "Center: " << model.center() << '\n'
               << "Memory usage: " << double(model.vertices.capacity()*sizeof(glm::vec3) + model.faces.capacity()*sizeof(rd::Face) + model.bvh().capacity()*sizeof(rd::BVHNode))/1024.0 << " KB"
               << std::endl;
-
-    exportBVH("bvh.stl", model.bvh());
 
     // Create 800x600 px image and depth buffer
     std::vector<rd::Color> colorBuffer(800*600);

@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
     // Load model from STL file. Let rendirt guess the format
     rd::Model model;
     rd::Model::Error err = model.loadSTL(*source);
+    model.rebuildBVH();
 
     if (source == &file)
         file.close();
@@ -52,9 +53,10 @@ int main(int argc, char* argv[]) {
               << std::chrono::duration_cast<frac_ms>(end - start).count() << " ms\n"
               << "Vertex count: " << model.vertices.size() << '\n'
               << "Face count: " << model.faces.size() << '\n'
+              << "BVH node count: " << model.bvh().size() << '\n'
               << "Bounding box: { " << model.boundingBox().from << ", " << model.boundingBox().to << " }\n"
               << "Center: " << model.center() << '\n'
-              << "Memory usage: " << double(model.vertices.capacity()*sizeof(glm::vec3) + model.faces.capacity()*sizeof(rd::Face))/1024.0 << " KB"
+              << "Memory usage: " << double(model.vertices.capacity()*sizeof(glm::vec3) + model.faces.capacity()*sizeof(rd::Face) + model.bvh().capacity()*sizeof(rd::BVHNode))/1024.0 << " KB"
               << std::endl;
 
     SDL_Window* window;

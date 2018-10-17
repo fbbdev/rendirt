@@ -31,6 +31,7 @@
 #include "rendirt.hpp"
 
 #include <glm/gtc/matrix_access.hpp>
+#include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/normal.hpp>
 
 #include <algorithm>
@@ -40,7 +41,7 @@
 #include <cstdint>
 #include <limits>
 #include <numeric>
-#include <type_traits>
+#include <tuple>
 
 using namespace rendirt;
 
@@ -57,6 +58,8 @@ void Model::updateBoundingBox() {
 }
 
 namespace {
+    static constexpr std::size_t InvalidIndex = std::numeric_limits<std::size_t>::max();
+
     struct BVHObject {
         size_t face;
         AABB bbox;
@@ -79,7 +82,7 @@ namespace {
             size_t(last - base)
         });
 
-        if (last - first <= typename std::make_signed<size_t>::type(targetLoad))
+        if (last - first <= std::intptr_t(targetLoad))
             return;
 
         // Sort objects by centroid position along the largest dimension
@@ -159,16 +162,14 @@ void Model::rebuildBVH(size_t targetLoad) {
     sortedFaces.clear();
     sortedFaces.shrink_to_fit();
 
-    static constexpr size_t unmapped = std::numeric_limits<size_t>::max();
-
-    std::vector<size_t> remap(vertices.size(), unmapped);
+    std::vector<size_t> remap(vertices.size(), InvalidIndex);
     std::vector<glm::vec3> sortedVertices;
 
     sortedVertices.reserve(vertices.size());
 
     for (auto& face: faces) {
         for (auto& vertex: face.vertex) {
-            if (remap[vertex] == unmapped) {
+            if (remap[vertex] == InvalidIndex) {
                 remap[vertex] = sortedVertices.size();
                 sortedVertices.push_back(vertices[vertex]);
             }
@@ -489,97 +490,140 @@ char const* Model::errorString(Error err) {
 }
 
 // Renderer
+namespace {
+    struct Ray {
+        glm::vec3 origin;
+        glm::vec3 direction;
+        glm::vec3 invDirection;
+
+        explicit Ray(glm::vec3 o, glm::vec3 d)
+            : origin(o), direction(d), invDirection(1.0f/d)
+            {}
+
+        Ray(Ray const&) = default;
+        Ray(Ray&&) = default;
+
+        glm::vec3 operator()(float t) const {
+            return origin + t*direction;
+        }
+
+        std::tuple<bool, float, float> intersectAABB(AABB const& aabb) const {
+            auto from = (aabb.from - origin) * invDirection;
+            auto to = (aabb.to - origin) * invDirection;
+
+            auto tmin = glm::compMax(glm::min(from, to));
+            auto tmax = glm::compMin(glm::max(from, to));
+
+            return { tmax > glm::max(tmin, 0.0f), tmin, tmax };
+        }
+
+        std::tuple<bool, float, glm::vec2> intersectTriangle(Face const& face, std::vector<glm::vec3> const& vertices) {
+            return {};
+        }
+    };
+
+    std::tuple<bool, float, AABB> searchBVHNode(std::vector<BVHNode> const& bvh, BVHNode const& node,
+                                                std::tuple<bool, float, float> const& nodeInt, Ray const& ray) {
+        if (node.leaf)
+            return { true, std::get<1>(nodeInt), node.bbox };
+
+        auto int1 = ray.intersectAABB(bvh[node.left()].bbox);
+        auto int2 = ray.intersectAABB(bvh[node.right()].bbox);
+
+        if (!(std::get<0>(int1) && std::get<0>(int2))) {
+            if (std::get<0>(int1))
+                return searchBVHNode(bvh, bvh[node.left()], int1, ray);
+            else if (std::get<0>(int2))
+                return searchBVHNode(bvh, bvh[node.right()], int2, ray);
+            else
+                return { false, 0.0f, AABB{} };
+        }
+
+        bool order = std::get<1>(int1) <= std::get<1>(int2);
+        auto const& firstNode = order ? bvh[node.left()] : bvh[node.right()];
+        auto const& firstInt = order ? int1 : int2;
+        auto const& secondNode = order ? bvh[node.right()] : bvh[node.left()];
+        auto const& secondInt = order ? int2 : int1;
+
+        auto res = searchBVHNode(bvh, firstNode, firstInt, ray);
+        if (std::get<0>(res) && std::get<1>(res) <= std::get<1>(secondInt))
+            return res;
+        return searchBVHNode(bvh, secondNode, secondInt, ray);
+    }
+
+    std::tuple<bool, float, AABB> searchBVH(std::vector<BVHNode> const& bvh, Ray const& ray) {
+        if (bvh.empty())
+            return { false, 0.0f, AABB{} };
+
+        auto rootInt = ray.intersectAABB(bvh.front().bbox);
+
+        if (!std::get<0>(rootInt))
+            return { false, 0.0f, AABB{} };
+
+        return searchBVHNode(bvh, bvh.front(), rootInt, ray);
+    }
+} /* namespace */
+
 size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
                        Model const& model, glm::mat4 const& modelViewProj,
                        Shader const& shader, CullingMode cullingMode)
 {
     assert(color.width == depth.width && color.height == depth.height);
 
-    size_t faceCount = 0;
-
     using vec2s = glm::vec<2, size_t>;
     const vec2s imgSize(color.width, color.height);
     const glm::vec2 imgSizef(imgSize);
 
-    glm::vec2 sampleStep = glm::vec2(2.0f, -2.0f)/imgSizef;
+    const glm::vec2 sampleStep = glm::vec2(2.0f, -2.0f)/imgSizef;
+    const glm::vec2 sampleOffset = sampleStep/2.0f;
+    glm::vec2 sampleRow = glm::vec2(-1.0f, 1.0f) + sampleOffset;
 
-    for (auto const& face: model.faces) {
-        glm::vec4 clipf[3] = {
-            modelViewProj * glm::vec4(model.vertices[face.vertex[0]], 1.0f),
-            modelViewProj * glm::vec4(model.vertices[face.vertex[1]], 1.0f),
-            modelViewProj * glm::vec4(model.vertices[face.vertex[2]], 1.0f)
-        };
+    const glm::mat4 invMVP = glm::inverse(modelViewProj);
 
-        clipf[0] /= clipf[0].w; clipf[1] /= clipf[1].w; clipf[2] /= clipf[2].w;
+    constexpr unsigned int Near = 0, Far = 1;
 
-        // Face culling by winding detection
-        const float doubleArea = ((clipf[0].y - clipf[1].y)*clipf[2].x + (clipf[1].x - clipf[0].x)*clipf[2].y + (clipf[0].x*clipf[1].y - clipf[0].y*clipf[1].x));
-        if ((cullingMode == CullCW && doubleArea <= 0.0f) || (cullingMode == CullCCW && doubleArea > 0.0f))
-            continue;
+    const glm::vec4 rayStart[2] = {
+        invMVP*glm::vec4(sampleRow, 1.0f, 1.0f),
+        invMVP*glm::vec4(sampleRow, -1.0f, 1.0f)
+    };
 
-        AABB brect = {
-            glm::min(clipf[0], glm::min(clipf[1], clipf[2])),
-            glm::max(clipf[0], glm::max(clipf[1], clipf[2]))
-        };
+    const glm::vec4 rayEnd[2] = {
+        invMVP*glm::vec4(1.0f + sampleOffset.x, -1.0f + sampleOffset.y, 1.0f, 1.0f),
+        invMVP*glm::vec4(1.0f + sampleOffset.x, -1.0f + sampleOffset.y, -1.0f, 1.0f)
+    };
 
-        brect.from = glm::max(brect.from, glm::vec3(-1.0f, -1.0f, -1.0f));
-        brect.to = glm::min(brect.to, glm::vec3(1.0f, 1.0f, 1.0f));
-        const auto dims = glm::abs(brect.to - brect.from);
+    glm::vec3 rayOrgRow = rayStart[Near]/rayStart[Near].w;
+    glm::vec3 rayDirRow = glm::vec3(rayStart[Far]/rayStart[Far].w) - rayOrgRow;
 
-        // Discard faces outside clipping planes
-        if (dims.x <= 0.0f || dims.y <= 0.0f || brect.from.z >= 1.0f || brect.to.z <= -1.0f)
-            continue;
+    const glm::vec3 rayOrgEnd = rayEnd[Near]/rayEnd[Near].w;
+    const glm::vec3 rayDirEnd = glm::vec3(rayEnd[Far]/rayEnd[Far].w) - rayOrgEnd;
 
-        ++faceCount;
+    const glm::vec2 rayOrgStep = glm::vec2(rayOrgEnd - rayOrgRow)/imgSizef;
+    const glm::vec2 rayDirStep = glm::vec2(rayDirEnd - rayDirRow)/imgSizef;
 
-        const vec2s from =
-            glm::clamp(vec2s(glm::floor((glm::vec2(brect.from.x, -brect.to.y)*0.5f + 0.5f)*imgSizef)), vec2s(0, 0), imgSize);
-        const vec2s to =
-            glm::clamp(vec2s(glm::ceil((glm::vec2(brect.to.x, -brect.from.y)*0.5f + 0.5f)*imgSizef)), vec2s(0, 0), imgSize);
+    if (model.bvh().empty())
+        return 0;
 
-        // Matrix for computing barycentric coordinates normalized so their sum is 1
-        // XXX: column-major
-        const glm::mat3 barycentric = glm::mat3{
-            { clipf[1].y - clipf[2].y,                       clipf[2].y - clipf[0].y,                       clipf[0].y - clipf[1].y },
-            { clipf[2].x - clipf[1].x,                       clipf[0].x - clipf[2].x,                       clipf[1].x - clipf[0].x },
-            { clipf[1].x*clipf[2].y - clipf[1].y*clipf[2].x, clipf[2].x*clipf[0].y - clipf[2].y*clipf[0].x, clipf[0].x*clipf[1].y - clipf[0].y*clipf[1].x },
-        } / doubleArea;
+    for (size_t y = 0; y < color.height; ++y) {
+        glm::vec3 rayOrg = rayOrgRow, rayDir = rayDirRow;
+        glm::vec2 sample = sampleRow;
 
-        const glm::vec3 posParams[3] = {
-            model.vertices[face.vertex[0]],
-            model.vertices[face.vertex[1]] - model.vertices[face.vertex[0]],
-            model.vertices[face.vertex[2]] - model.vertices[face.vertex[0]]
-        };
-        const glm::vec3 zParams(clipf[0].z, clipf[1].z - clipf[0].z, clipf[2].z - clipf[0].z);
+        for (size_t x = 0; x < color.width; ++x) {
+            Ray ray(rayOrg, rayDir);
+            auto bvhInt = searchBVH(model.bvh(), ray);
 
-        const glm::vec2 sampleStart = (glm::vec2(from.x + 0.5f, from.y + 0.5f)/imgSizef - 0.5f) * glm::vec2(2.0f, -2.0f);
-        glm::vec2 sample = sampleStart;
+            color.buffer[y*color.stride + x] =
+                std::get<0>(bvhInt) ? Color(glm::vec3(std::get<1>(bvhInt)*255.0f), 255) : Color(0, 0, 0, 255);
 
-        glm::vec3 rowLambda = barycentric * glm::vec3(sampleStart, 1.0f);
-        glm::vec3 lambda = rowLambda;
-
-        const glm::vec3 rowLambdaStep = barycentric[1]*sampleStep.y;
-        const glm::vec3 lambdaStep = barycentric[0]*sampleStep.x;
-
-        for (size_t y = from.y; y < to.y; ++y, sample.y += sampleStep.y, rowLambda += rowLambdaStep) {
-            sample.x = sampleStart.x;
-            lambda = rowLambda;
-
-            for (size_t x = from.x; x < to.x; ++x, sample.x += sampleStep.x, lambda += lambdaStep) {
-                // Interpolate position and depth
-                const glm::vec3 pos = posParams[0] + lambda.y*posParams[1] + lambda.z*posParams[2];
-                const float z = zParams.x + lambda.y*zParams.y + lambda.z*zParams.z;
-
-                // Test if inside triangle, then depth test
-                if (!(std::signbit(lambda.x) | std::signbit(lambda.y) | std::signbit(lambda.z)) &&
-                    z > -1.0f && z < depth.buffer[y*depth.stride + x])
-                {
-                    depth.buffer[y*depth.stride + x] = z;
-                    color.buffer[y*color.stride + x] = shader(glm::vec3(sample, z), pos, face.normal);
-                }
-            }
+            rayOrg.x += rayOrgStep.x;
+            rayDir.x += rayDirStep.x;
+            sample.x += sampleStep.x;
         }
+
+        rayOrgRow.y += rayOrgStep.y;
+        rayDirRow.y += rayDirStep.y;
+        sampleRow.y += sampleStep.y;
     }
 
-    return faceCount;
+    return 0;
 }
