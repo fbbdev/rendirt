@@ -576,15 +576,15 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
 
     const glm::vec2 sampleStep = glm::vec2(2.0f, -2.0f)/imgSizef;
     const glm::vec2 sampleOffset = sampleStep/2.0f;
-    glm::vec2 sampleRow = glm::vec2(-1.0f, 1.0f) + sampleOffset;
+    glm::vec2 sampleTileRow = glm::vec2(-1.0f, 1.0f) + sampleOffset;
 
     const glm::mat4 invMVP = glm::inverse(modelViewProj);
 
     constexpr unsigned int Near = 0, Far = 1;
 
     const glm::vec4 rayStart[2] = {
-        invMVP*glm::vec4(sampleRow, 1.0f, 1.0f),
-        invMVP*glm::vec4(sampleRow, -1.0f, 1.0f)
+        invMVP*glm::vec4(sampleTileRow, 1.0f, 1.0f),
+        invMVP*glm::vec4(sampleTileRow, -1.0f, 1.0f)
     };
 
     const glm::vec4 rayEnd[2] = {
@@ -592,37 +592,59 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
         invMVP*glm::vec4(1.0f + sampleOffset.x, -1.0f + sampleOffset.y, -1.0f, 1.0f)
     };
 
-    glm::vec3 rayOrgRow = rayStart[Near]/rayStart[Near].w;
-    glm::vec3 rayDirRow = glm::vec3(rayStart[Far]/rayStart[Far].w) - rayOrgRow;
+    glm::vec3 rayOrgTileRow = rayStart[Near]/rayStart[Near].w;
+    glm::vec3 rayDirTileRow = glm::vec3(rayStart[Far]/rayStart[Far].w) - rayOrgTileRow;
 
     const glm::vec3 rayOrgEnd = rayEnd[Near]/rayEnd[Near].w;
     const glm::vec3 rayDirEnd = glm::vec3(rayEnd[Far]/rayEnd[Far].w) - rayOrgEnd;
 
-    const glm::vec2 rayOrgStep = glm::vec2(rayOrgEnd - rayOrgRow)/imgSizef;
-    const glm::vec2 rayDirStep = glm::vec2(rayDirEnd - rayDirRow)/imgSizef;
+    const glm::vec2 rayOrgStep = glm::vec2(rayOrgEnd - rayOrgTileRow)/imgSizef;
+    const glm::vec2 rayDirStep = glm::vec2(rayDirEnd - rayDirTileRow)/imgSizef;
 
     if (model.bvh().empty())
         return 0;
 
-    for (size_t y = 0; y < color.height; ++y) {
-        glm::vec3 rayOrg = rayOrgRow, rayDir = rayDirRow;
-        glm::vec2 sample = sampleRow;
+    for (size_t ty = 0; ty < color.height; ty += 32) {
+        glm::vec3 rayOrgTileCol = rayOrgTileRow, rayDirTileCol = rayDirTileRow;
+        glm::vec2 sampleTileCol = sampleTileRow;
 
-        for (size_t x = 0; x < color.width; ++x) {
-            Ray ray(rayOrg, rayDir);
-            auto bvhInt = searchBVH(model.bvh(), ray);
+        for (size_t tx = 0; tx < color.width; tx += 32) {
+            glm::vec3 rayOrgRow = rayOrgTileCol, rayDirRow = rayDirTileCol;
+            glm::vec2 sampleRow = sampleTileCol;
 
-            color.buffer[y*color.stride + x] =
-                std::get<0>(bvhInt) ? Color(glm::vec3(std::get<1>(bvhInt)*255.0f), 255) : Color(0, 0, 0, 255);
+            size_t yend = glm::min(ty + 32, color.height);
+            size_t xend = glm::min(tx + 32, color.width);
 
-            rayOrg.x += rayOrgStep.x;
-            rayDir.x += rayDirStep.x;
-            sample.x += sampleStep.x;
+            // Tile loop
+            for (size_t y = ty; y < yend; ++y) {
+                glm::vec3 rayOrg = rayOrgRow, rayDir = rayDirRow;
+                glm::vec2 sample = sampleRow;
+
+                for (size_t x = tx; x < xend; ++x) {
+                    Ray ray(rayOrg, rayDir);
+                    auto bvhInt = searchBVH(model.bvh(), ray);
+
+                    color.buffer[y*color.stride + x] =
+                        std::get<0>(bvhInt) ? Color(glm::vec3(std::get<1>(bvhInt)*255.0f), 255) : Color(0, 0, 0, 255);
+
+                    rayOrg.x += rayOrgStep.x;
+                    rayDir.x += rayDirStep.x;
+                    sample.x += sampleStep.x;
+                }
+
+                rayOrgRow.y += rayOrgStep.y;
+                rayDirRow.y += rayDirStep.y;
+                sampleRow.y += sampleStep.y;
+            }
+
+            rayOrgTileCol.x += 32*rayOrgStep.x;
+            rayDirTileCol.x += 32*rayDirStep.x;
+            sampleTileCol.x += 32*sampleStep.x;
         }
 
-        rayOrgRow.y += rayOrgStep.y;
-        rayDirRow.y += rayDirStep.y;
-        sampleRow.y += sampleStep.y;
+        rayOrgTileRow.y += 32*rayOrgStep.y;
+        rayDirTileRow.y += 32*rayDirStep.y;
+        sampleTileRow.y += 32*sampleStep.y;
     }
 
     return 0;
