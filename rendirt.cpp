@@ -590,23 +590,34 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const&,
     constexpr unsigned int Near = 0, Far = 1;
 
     const glm::vec4 rayStart[2] = {
-        invMVP*glm::vec4(sampleTileRow, 1.0f, 1.0f),
-        invMVP*glm::vec4(sampleTileRow, -1.0f, 1.0f)
+        invMVP*glm::vec4(sampleTileRow, -1.0f, 1.0f),
+        invMVP*glm::vec4(sampleTileRow, 1.0f, 1.0f)
     };
 
-    const glm::vec4 rayEnd[2] = {
-        invMVP*glm::vec4(1.0f + sampleOffset.x, -1.0f + sampleOffset.y, 1.0f, 1.0f),
-        invMVP*glm::vec4(1.0f + sampleOffset.x, -1.0f + sampleOffset.y, -1.0f, 1.0f)
+    const glm::vec4 rayEndCol[2] = {
+        invMVP*glm::vec4(1.0f + sampleOffset.x, sampleTileRow.y, -1.0f, 1.0f),
+        invMVP*glm::vec4(1.0f + sampleOffset.x, sampleTileRow.y, 1.0f, 1.0f)
+    };
+
+    const glm::vec4 rayEndRow[2] = {
+        invMVP*glm::vec4(sampleTileRow.x, -1.0f + sampleOffset.y, -1.0f, 1.0f),
+        invMVP*glm::vec4(sampleTileRow.x, -1.0f + sampleOffset.y, 1.0f, 1.0f),
     };
 
     glm::vec3 rayOrgTileRow = rayStart[Near]/rayStart[Near].w;
     glm::vec3 rayDirTileRow = glm::vec3(rayStart[Far]/rayStart[Far].w) - rayOrgTileRow;
 
-    const glm::vec3 rayOrgEnd = rayEnd[Near]/rayEnd[Near].w;
-    const glm::vec3 rayDirEnd = glm::vec3(rayEnd[Far]/rayEnd[Far].w) - rayOrgEnd;
+    const glm::vec3 rayOrgEndCol = rayEndCol[Near]/rayEndCol[Near].w;
+    const glm::vec3 rayDirEndCol = glm::vec3(rayEndCol[Far]/rayEndCol[Far].w) - rayOrgEndCol;
 
-    const glm::vec2 rayOrgStep = glm::vec2(rayOrgEnd - rayOrgTileRow)/imgSizef;
-    const glm::vec2 rayDirStep = glm::vec2(rayDirEnd - rayDirTileRow)/imgSizef;
+    const glm::vec3 rayOrgEndRow = rayEndRow[Near]/rayEndRow[Near].w;
+    const glm::vec3 rayDirEndRow = glm::vec3(rayEndRow[Far]/rayEndRow[Far].w) - rayOrgEndCol;
+
+    const glm::vec3 rayOrgColStep = (rayOrgEndCol - rayOrgTileRow)/imgSizef.x;
+    const glm::vec3 rayDirColStep = (rayDirEndCol - rayDirTileRow)/imgSizef.x;
+
+    const glm::vec3 rayOrgRowStep = (rayOrgEndRow - rayOrgTileRow)/imgSizef.y;
+    const glm::vec3 rayDirRowStep = (rayDirEndRow - rayDirTileRow)/imgSizef.y;
 
     if (model.bvh().empty())
         return 0;
@@ -634,23 +645,23 @@ size_t rendirt::render(Image<Color> const& color, Image<float> const&,
                     color.buffer[y*color.stride + x] =
                         std::get<0>(bvhInt) ? Color(glm::vec3(std::get<1>(bvhInt)*255.0f), 255) : Color(0, 0, 0, 255);
 
-                    rayOrg.x += rayOrgStep.x;
-                    rayDir.x += rayDirStep.x;
+                    rayOrg += rayOrgColStep;
+                    rayDir += rayDirColStep;
                     sample.x += sampleStep.x;
                 }
 
-                rayOrgRow.y += rayOrgStep.y;
-                rayDirRow.y += rayDirStep.y;
+                rayOrgRow += rayOrgRowStep;
+                rayDirRow += rayDirRowStep;
                 sampleRow.y += sampleStep.y;
             }
 
-            rayOrgTileCol.x += 32*rayOrgStep.x;
-            rayDirTileCol.x += 32*rayDirStep.x;
+            rayOrgTileCol += 32.0f*rayOrgColStep;
+            rayDirTileCol += 32.0f*rayDirColStep;
             sampleTileCol.x += 32*sampleStep.x;
         }
 
-        rayOrgTileRow.y += 32*rayOrgStep.y;
-        rayDirTileRow.y += 32*rayDirStep.y;
+        rayOrgTileRow += 32.0f*rayOrgRowStep;
+        rayDirTileRow += 32.0f*rayDirRowStep;
         sampleTileRow.y += 32*sampleStep.y;
     }
 
