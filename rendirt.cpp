@@ -71,17 +71,10 @@ namespace {
     }
 
     template<typename Iterator>
-    void buildBVHSide(std::vector<BVHNode>& bvh, AABB bbox,
+    void buildBVHSide(std::vector<BVHNode>& bvh, BVHNode& node, AABB bbox,
                       Iterator base, Iterator first, Iterator last,
                       size_t targetLoad)
     {
-        size_t index = bvh.size();
-        bvh.push_back(BVHNode{
-            bbox, true,
-            size_t(first - base),
-            size_t(last - base)
-        });
-
         if (last - first <= std::intptr_t(targetLoad))
             return;
 
@@ -95,18 +88,18 @@ namespace {
         });
 
         glm::vec3 centroid = (bbox.from + bbox.to) / 2.0f;
-        AABB childBbox = first->bbox;
+        AABB leftBbox = first->bbox;
 
         Iterator median = first + (last - first)/2;
         AABB medianBbox = {};
 
         Iterator split = std::next(first);
         for (; split != last; ++split) {
-            childBbox.from = glm::min(childBbox.from, split->bbox.from);
-            childBbox.to = glm::max(childBbox.to, split->bbox.to);
+            leftBbox.from = glm::min(leftBbox.from, split->bbox.from);
+            leftBbox.to = glm::max(leftBbox.to, split->bbox.to);
 
             if (split == median)
-                medianBbox = childBbox;
+                medianBbox = leftBbox;
 
             if (split->centroid[dir] > centroid[dir])
                 break;
@@ -115,17 +108,29 @@ namespace {
         // If empty, revert to median splitting
         if (split == last) {
             split = median;
-            childBbox = medianBbox;
+            leftBbox = medianBbox;
         }
 
-        bvh[index].leaf = false;
-        bvh[index].leftOrFirstFace = bvh.size();
-        buildBVHSide(bvh, childBbox, base, first, split, targetLoad);
+        node.leaf = false;
 
-        childBbox = std::accumulate(std::next(split), last, split->bbox, accumulateBbox);
+        node.leftOrFirstFace = bvh.size();
+        bvh.push_back(BVHNode{
+            leftBbox, true,
+            size_t(first - base),
+            size_t(split - base)
+        });
 
-        bvh[index].rightOrLastFace = bvh.size();
-        return buildBVHSide(bvh, childBbox, base, split, last, targetLoad);
+        AABB rightBbox = std::accumulate(std::next(split), last, split->bbox, accumulateBbox);
+
+        node.rightOrLastFace = bvh.size();
+        bvh.push_back(BVHNode{
+            rightBbox, true,
+            size_t(split - base),
+            size_t(last - base)
+        });
+
+        buildBVHSide(bvh, bvh[node.left()], leftBbox, base, first, split, targetLoad);
+        return buildBVHSide(bvh, bvh[node.right()], rightBbox, base, split, last, targetLoad);
     }
 } /* namespace */
 
@@ -149,7 +154,9 @@ void Model::rebuildBVH(size_t targetLoad) {
     });
 
     bvh_.reserve(2*objects.size() + 1);
-    buildBVHSide(bvh_, boundingBox(), objects.begin(), objects.begin(), objects.end(), targetLoad + 1);
+
+    bvh_.push_back(BVHNode{ boundingBox(), true, 0, objects.size() });
+    buildBVHSide(bvh_, bvh_.back(), boundingBox(), objects.begin(), objects.begin(), objects.end(), targetLoad + 1);
 
     std::vector<Face> sortedFaces;
 
@@ -517,7 +524,7 @@ namespace {
             return { tmax > glm::max(tmin, 0.0f), tmin, tmax };
         }
 
-        std::tuple<bool, float, glm::vec2> intersectTriangle(Face const& face, std::vector<glm::vec3> const& vertices) {
+        std::tuple<bool, float, glm::vec2> intersectTriangle(Face const&, std::vector<glm::vec3> const&) {
             return {};
         }
     };
@@ -527,23 +534,23 @@ namespace {
         if (node.leaf)
             return { true, std::get<1>(nodeInt), node.bbox };
 
-        auto int1 = ray.intersectAABB(bvh[node.left()].bbox);
-        auto int2 = ray.intersectAABB(bvh[node.right()].bbox);
+        auto lInt = ray.intersectAABB(bvh[node.left()].bbox);
+        auto rInt = ray.intersectAABB(bvh[node.right()].bbox);
 
-        if (!(std::get<0>(int1) && std::get<0>(int2))) {
-            if (std::get<0>(int1))
-                return searchBVHNode(bvh, bvh[node.left()], int1, ray);
-            else if (std::get<0>(int2))
-                return searchBVHNode(bvh, bvh[node.right()], int2, ray);
+        if (!(std::get<0>(lInt) && std::get<0>(rInt))) {
+            if (std::get<0>(lInt))
+                return searchBVHNode(bvh, bvh[node.left()], lInt, ray);
+            else if (std::get<0>(rInt))
+                return searchBVHNode(bvh, bvh[node.right()], rInt, ray);
             else
                 return { false, 0.0f, AABB{} };
         }
 
-        bool order = std::get<1>(int1) <= std::get<1>(int2);
+        bool order = std::get<1>(lInt) <= std::get<1>(rInt);
         auto const& firstNode = order ? bvh[node.left()] : bvh[node.right()];
-        auto const& firstInt = order ? int1 : int2;
+        auto const& firstInt = order ? lInt : rInt;
         auto const& secondNode = order ? bvh[node.right()] : bvh[node.left()];
-        auto const& secondInt = order ? int2 : int1;
+        auto const& secondInt = order ? rInt : lInt;
 
         auto res = searchBVHNode(bvh, firstNode, firstInt, ray);
         if (std::get<0>(res) && std::get<1>(res) <= std::get<1>(secondInt))
@@ -564,9 +571,9 @@ namespace {
     }
 } /* namespace */
 
-size_t rendirt::render(Image<Color> const& color, Image<float> const& depth,
+size_t rendirt::render(Image<Color> const& color, Image<float> const&,
                        Model const& model, glm::mat4 const& modelViewProj,
-                       Shader const& shader, CullingMode cullingMode)
+                       Shader const&, CullingMode)
 {
     assert(color.width == depth.width && color.height == depth.height);
 
