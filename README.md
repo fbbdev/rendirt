@@ -98,8 +98,8 @@ file.close();
 
 std::vector<rd::Color> colorBuffer(800*600);
 std::vector<float> depthBuffer(800*600);
-Image<rd::Color> image(colorBuffer.data(), 800, 600);
-Image<float> depth(depthBuffer.data(), 800, 600);
+rd::Image<rd::Color> image(colorBuffer.data(), 800, 600);
+rd::Image<float> depth(depthBuffer.data(), 800, 600);
 
 image.clear(Color(0, 0, 0, 255));
 depth.clear(1.0f); // Important!
